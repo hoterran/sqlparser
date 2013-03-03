@@ -1,0 +1,3 @@
+select a.z,c.d from t1 a, (select * from b) b where 
+a.id = 111 and (b.id = 222 or z.id = 333) and b.id = kkk;
+

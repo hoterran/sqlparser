@@ -15,3 +15,11 @@
 *.exe
 *.out
 *.app
+
+#
+format
+sql.c
+sql.output
+sql.tab.c
+sql.tab.h
+
