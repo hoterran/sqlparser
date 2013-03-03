@@ -1,7 +1,7 @@
 %option noyywrap nodefault yylineno case-insensitive
 %{
 #include "adlist.h"
-#include "lex.h"
+#include "sql.h"
 #include "sql.tab.h"
 #include <stdarg.h>
 #include <string.h>

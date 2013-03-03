@@ -1,6 +1,6 @@
 #include <assert.h>
 #include "adlist.h"
-#include "lex.h"
+#include "sql.h"
 #include "sql.tab.h"
 #include <stdlib.h>
 #include <stdarg.h>
