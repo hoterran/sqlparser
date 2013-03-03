@@ -1,2 +1,5 @@
-select trim("aaa"), a,b,c, count(*), sum(*), sum(d), avg(z), curdate(), curtime() from tab b limit 2;
+select trim("aaa"), a,b,c, count(*), sum(*), sum(d), 
+--test
+substr(b.c, 1,2),
+avg(z), curdate(), curtime() from tab b limit 2;
 

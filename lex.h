@@ -82,12 +82,13 @@ typedef struct Item_t {
 
     /* child */
     struct Item_t *left;
-    void *right; // possible Item_t, Stmt_t;
+    void *right;        /* possible Item_t, Stmt_t; */
 
     /* subquery */
     void *next;
 
-    /* desc asc*/
+    /* desc or asc, default asc */
+    int isDesc;
 } Item;
 
 enum SqlStep {

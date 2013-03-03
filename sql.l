@@ -12,7 +12,7 @@ int oldstate;
 
 %}
 
-	/* comment, dont care line comment -- */
+	/* comment */
 %x COMMENT
 	/* between */
 %s BTWMODE 
@@ -245,6 +245,9 @@ YEAR	{ return YEAR; }
 YEAR_MONTH	{ return YEAR_MONTH; }
 ZEROFILL	{ return ZEROFILL; }
 
+    /* comment */
+"--".*\n ;
+
    /* numbers */
 
 -?[0-9]+	        { yylval.intval = atoi(yytext); return INTNUM; }
@@ -283,20 +286,20 @@ B'[01]+'     { yylval.strval = strdup(yytext); return STRING; }
 "&&"		{ return ANDOP; }
 "||"            { return OR; }
 
-"="	{ yylval.subtok = 4; return COMPARISON; }
+"="	    { yylval.subtok = 4; return COMPARISON; }
 "<=>"	{ yylval.subtok = 12; return COMPARISON; }
 ">="	{ yylval.subtok = 6; return COMPARISON; }
-">"	{ yylval.subtok = 2; return COMPARISON; }
+">"	    { yylval.subtok = 2; return COMPARISON; }
 "<="	{ yylval.subtok = 5; return COMPARISON; }
-"<"	{ yylval.subtok = 1; return COMPARISON; }
+"<"	    { yylval.subtok = 1; return COMPARISON; }
 "!="	|
 "<>"	{ yylval.subtok = 3; return COMPARISON; }
-
 "<<"	{ yylval.subtok = 1; return SHIFT; }
 ">>"	{ yylval.subtok = 2; return SHIFT; }
 
         /* functions */
 
+AVG/"("             { return FAVG; }
 SUBSTR(ING)?/"("	{ return FSUBSTRING; }
 TRIM/"("			{ return FTRIM; }
 DATE_ADD/"("		{ return FDATE_ADD; }
@@ -366,7 +369,7 @@ sum    { int c = input(); unput(c);
 
 	/* comments */   
 #.*		;
-"--"[ \t].*	;
+
 
 "/*"            { oldstate = YY_START; BEGIN COMMENT; }
 <COMMENT>"*/"   { BEGIN oldstate; }

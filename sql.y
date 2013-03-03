@@ -12,6 +12,8 @@ Stmt *curStmt;
 void yyerror(char *s, ...);
 void debug(char *s, ...);
 
+//extern int yydebug = 1;
+
 %}
 
 %union {
@@ -362,9 +364,9 @@ select_stmt: select_reduce_stmt select_opts select_expr_list {
 	;
 
 opt_where: /* nil */ 
-   | WHERE expr {
+    | WHERE expr {
 		debug("WHERE");
-		listAddNodeHead(curStmt->whereList, $2);
+		listAddNodeTail(curStmt->whereList, $2);
 	};
 	/* -GROUPBY */
 opt_groupby: /* nil */ 
@@ -394,21 +396,27 @@ opt_with_rollup: /* nil */  { $$ = 0; }
    | WITH ROLLUP  { $$ = 1; }
    ;
 
-opt_having: /* nil */ | HAVING expr { debug("HAVING"); };
+opt_having: /* nil */ | HAVING expr {
+        debug("HAVING");
+        listAddNodeTail(curStmt->havingList, $2); 
+    };
 
 	/* -ORDER */
-opt_orderby: /* nil */ | ORDER BY orderby_list { debug("ORDERBYLIST %d", $3); 
-		}
-   ;
+opt_orderby: /* nil */ | ORDER BY orderby_list { 
+        debug("ORDERBYLIST %d", $3); 
+    };
+
 orderby_list: expr opt_asc_desc { 
 		debug("ORDERBY 1 %d",  $2); 
+        $1->isDesc = $2;
+		listAddNodeTail(curStmt->orderList, $1);
 		$$ = 1;
-		listAddNodeHead(curStmt->orderList, $1);
 	}
-	| orderby_list',' expr opt_asc_desc {
-		debug("ORDERBY2 %d",  $4); 
-		$$ = $1 + 1; 
+	| orderby_list ',' expr opt_asc_desc {
+		debug("ORDERBY 2 %d",  $4); 
+        $3->isDesc = $4;
 		listAddNodeTail(curStmt->orderList, $3);	
+		$$ = $1 + 1; 
 	}
 	;
 
@@ -603,7 +611,8 @@ delete_stmt: delete_reduce_stmt delete_opts FROM NAME
 		Table *t = calloc(1, sizeof(*t));
 		t->name = strdup($4);
 		free($4);
-		listAddNodeHead(curStmt->joinList, t);
+		listAddNodeTail(curStmt->joinList, t);
+		curStmt->sql_command = SQLCOM_DELETE;
 	}
 	;
 
@@ -771,10 +780,11 @@ update_asgn_list:
 		i->token1 = NAME;
 		Item *c = calloc(1, sizeof(*c));
 		c->token1 = COMPARISON;
+        c->token2 = $2;
 		c->left = i;
 		c->right = $3;
 
-		listAddNodeHead(curStmt->updateSetList, c); 
+		listAddNodeTail(curStmt->updateSetList, c); 
 		$$ = 1;
 	}
 	| NAME '.' NAME COMPARISON expr { 
@@ -788,10 +798,11 @@ update_asgn_list:
 		i->token1 = NAME;
 		Item *c = calloc(1, sizeof(*c));
 		c->token1 = COMPARISON;
+        c->token2 = $4;
 		c->left = i;
 		c->right = $5;
 
-		listAddNodeHead(curStmt->updateSetList, c); 
+		listAddNodeTail(curStmt->updateSetList, c); 
 		$$ = 1; 
 	}
 	| update_asgn_list ',' NAME COMPARISON expr { 
@@ -803,10 +814,11 @@ update_asgn_list:
 		i->token1 = NAME;
 		Item *c = calloc(1, sizeof(*c));
 		c->token1 = COMPARISON;
+        c->token2 = $4;
 		c->left = i;
 		c->right = $5;
 
-		listAddNodeHead(curStmt->updateSetList, c); 
+		listAddNodeTail(curStmt->updateSetList, c); 
 		$$ = $1 + 1;
 	}
 	| update_asgn_list ',' NAME '.' NAME COMPARISON expr { 
@@ -820,10 +832,11 @@ update_asgn_list:
 		i->token1 = NAME;
 		Item *c = calloc(1, sizeof(*c));
 		c->token1 = COMPARISON;
+        c->token2 = $6;
 		c->left = i;
 		c->right = $7;
 
-		listAddNodeHead(curStmt->updateSetList, c); 
+		listAddNodeTail(curStmt->updateSetList, c); 
 		$$ = $1 + 1;
 	}
 	;
@@ -1007,10 +1020,11 @@ set_expr:
 		i->token1 = NAME;
 		Item *c = calloc(1, sizeof(*c));
 		c->token1 = COMPARISON;
+        c->token2 = $2;
 		c->left = i;
 		c->right = $3;
 
-		listAddNodeHead(curStmt->setList, c); 
+		listAddNodeTail(curStmt->setList, c); 
 	}
     ;
 
@@ -1138,6 +1152,7 @@ expr: expr '+' expr { debug("ADD");
    | expr COMPARISON expr { debug("CMP %d ", $2);
 		Item *i = calloc(1, sizeof(*i));
 		i->token1 = COMPARISON;
+        i->token2 = $2;
 		i->left = $1;
 		i->right = $3;
 		$$ = i;
@@ -1146,6 +1161,7 @@ expr: expr '+' expr { debug("ADD");
 		/* TODO */
 		Item *i = calloc(1, sizeof(*i));
 		i->token1 = COMPARISON;
+        i->token2 = $2;
 		i->left = $1;
 		i->next = NULL;
 		$$ = i;
@@ -1244,29 +1260,31 @@ expr: expr BETWEEN expr AND expr %prec BETWEEN { debug("BETWEEN");
 	;
 
     /* func(a, b, c)
-        item(func)
-            right = a
-			left = NULL
-		item(a)
-			right = b
-			left = func
+
+        from c -> b ->a -> func
+
+		item(c)
+			right = NULL;
+			left = b
 		item(b)
 			right = c
 			left =  a
-		item(c)
-			right = func
-			left = b
-
+		item(a)
+			right = b
+			left = func
+        item(func)
+            right = a
+			left = NULL
 	*/	
 val_list: expr {
-        debug("val_list:expr1 %p", $1);
+        debug("val_list:expr1 %p %s", $1, $1->name);
         $$ = $1; 
     }
     | expr ',' val_list {
-        debug("val_list:expr2 %p, %p", $3, $1); 
-        $3->right = $1;
-        $1->left = $3;
-		$$ = $3;
+        debug("val_list:expr2 %p %s, %p %s", $3, $3->name, $1, $1->name); 
+        $3->left = $1;
+        $1->right = $3;
+		$$ = $1;
 	}
     ;
 
@@ -1411,18 +1429,24 @@ expr: FCOUNT '(' '*' ')'	{
 	| FVAR_SAMP '(' expr ')'			{ debug ("VAR_SAMP") }
 	;
 
-expr: FSUBSTRING '(' val_list ')' {  debug("CALL %d SUBSTR", $3);}
-   | FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
-   | FSUBSTRING '(' expr FROM expr FOR expr ')' {  debug("CALL 3 SUBSTR"); }
-| FTRIM '(' val_list ')' { 
+expr: FSUBSTRING '(' val_list ')' {
+        debug("CALL SUBSTR");
+		Item *i = calloc(1, sizeof(*i));
+		i->right = $3;
+		i->token1 = FSUBSTRING;
+		$$ = i;
+    }
+    | FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
+    | FSUBSTRING '(' expr FROM expr FOR expr ')' {  debug("CALL 3 SUBSTR"); }
+    | FTRIM '(' val_list ')' { 
 		debug("CALL TRIM"); 
 		Item *i = calloc(1, sizeof(*i));
 		i->right = $3;
 		i->token1 = FTRIM;
 		$$ = i;
 	}
-   | FTRIM '(' trim_ltb expr FROM val_list ')' { debug("CALL 3 TRIM"); }
-   ;
+    | FTRIM '(' trim_ltb expr FROM val_list ')' { debug("CALL 3 TRIM"); }
+    ;
 
 trim_ltb: LEADING { debug("INT 1"); }
    | TRAILING { debug("INT 2"); }
