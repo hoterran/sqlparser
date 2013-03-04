@@ -17,17 +17,17 @@ void debug(char *s, ...);
 %}
 
 %union {
-	int intval;
-	double floatval;
-	char *strval;
-	int subtok;
-	list* list;
-	Item* item;
-	Table* tableval;
-	Stmt *stmt;
+    int intval;
+    double floatval;
+    char *strval;
+    int subtok;
+    list* list;
+    Item* item;
+    Table* tableval;
+    Stmt *stmt;
 }
-	
-	/* names and literal values */
+    
+    /* names and literal values */
 
 %token <strval> NAME
 %token <strval> STRING
@@ -329,63 +329,63 @@ void debug(char *s, ...);
 /* must ; end */
 
 stmt_list: stmt ';'
-	| stmt_list stmt ';'
-	;
+    | stmt_list stmt ';'
+    ;
 
    /* SELECT */
 
 stmt: select_stmt { debug("STMT"); }
-	;
+    ;
 
 select_reduce_stmt: SELECT {
-		Stmt *stmt = calloc(1, sizeof(*stmt));
-		stmtInit(stmt);
-		if (curStmt) {
-			stmt->father = curStmt;
-		}
-		debug("From %p to child %p", curStmt, stmt);
-		curStmt = stmt;
-	};
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+    };
 
 
 select_stmt: select_reduce_stmt select_opts select_expr_list { 
-		curStmt->sql_command = SQLCOM_SELECT; 
-	//	debug("SELECTNODATA %d %d", $2, $3);
-		$$ = curStmt;
-	}
-	| select_reduce_stmt select_opts select_expr_list
-	FROM table_references
-	opt_where opt_groupby opt_having opt_orderby opt_limit
-	opt_into_list { 
-		curStmt->sql_command = SQLCOM_SELECT; 
-	//	debug("SELECT %d %d %d", $2, $3, $5); 
-		$$ = curStmt;
-	}
-	;
+        curStmt->sql_command = SQLCOM_SELECT; 
+    //    debug("SELECTNODATA %d %d", $2, $3);
+        $$ = curStmt;
+    }
+    | select_reduce_stmt select_opts select_expr_list
+    FROM table_references
+    opt_where opt_groupby opt_having opt_orderby opt_limit
+    opt_into_list { 
+        curStmt->sql_command = SQLCOM_SELECT; 
+    //    debug("SELECT %d %d %d", $2, $3, $5); 
+        $$ = curStmt;
+    }
+    ;
 
 opt_where: /* nil */ 
     | WHERE expr {
-		debug("WHERE");
-		listAddNodeTail(curStmt->whereList, $2);
-	};
-	/* -GROUPBY */
+        debug("WHERE");
+        listAddNodeTail(curStmt->whereList, $2);
+    };
+    /* -GROUPBY */
 opt_groupby: /* nil */ 
-	| GROUP BY groupby_list opt_with_rollup { 
-		debug("GROUPBYLIST %d %d", $3, $4); 
-	}
-	;
+    | GROUP BY groupby_list opt_with_rollup { 
+        debug("GROUPBYLIST %d %d", $3, $4); 
+    }
+    ;
 
 groupby_list: expr opt_asc_desc { 
-		debug("GROUPBY1 %d",  $2); 
-		$$ = 1;
-		listAddNodeTail(curStmt->groupList, $1);
-	}
-	| groupby_list ',' expr opt_asc_desc { 
-		debug("GROUPBY2 %d",  $4); 
-		$$ = $1 + 1;
-		listAddNodeTail(curStmt->groupList, $3);
-	}
-	;
+        debug("GROUPBY1 %d",  $2); 
+        $$ = 1;
+        listAddNodeTail(curStmt->groupList, $1);
+    }
+    | groupby_list ',' expr opt_asc_desc { 
+        debug("GROUPBY2 %d",  $4); 
+        $$ = $1 + 1;
+        listAddNodeTail(curStmt->groupList, $3);
+    }
+    ;
 
 opt_asc_desc: /* nil */ { $$ = 0; }
    | ASC                { $$ = 0; }
@@ -401,35 +401,35 @@ opt_having: /* nil */ | HAVING expr {
         listAddNodeTail(curStmt->havingList, $2); 
     };
 
-	/* -ORDER */
+    /* -ORDER */
 opt_orderby: /* nil */ | ORDER BY orderby_list { 
         debug("ORDERBYLIST %d", $3); 
     };
 
 orderby_list: expr opt_asc_desc { 
-		debug("ORDERBY 1 %d",  $2); 
+        debug("ORDERBY 1 %d",  $2); 
         $1->isDesc = $2;
-		listAddNodeTail(curStmt->orderList, $1);
-		$$ = 1;
-	}
-	| orderby_list ',' expr opt_asc_desc {
-		debug("ORDERBY 2 %d",  $4); 
+        listAddNodeTail(curStmt->orderList, $1);
+        $$ = 1;
+    }
+    | orderby_list ',' expr opt_asc_desc {
+        debug("ORDERBY 2 %d",  $4); 
         $3->isDesc = $4;
-		listAddNodeTail(curStmt->orderList, $3);	
-		$$ = $1 + 1; 
-	}
-	;
+        listAddNodeTail(curStmt->orderList, $3);    
+        $$ = $1 + 1; 
+    }
+    ;
 
 opt_limit: /* nil */ | LIMIT expr {
-		debug("LIMIT 1"); 
-		listAddNodeTail(curStmt->limitList, $2);
-	}
-	| LIMIT expr ',' expr             { 
-		debug("LIMIT 2"); 
-		listAddNodeTail(curStmt->limitList, $2);
-		listAddNodeTail(curStmt->limitList, $4);
-	}
-	;
+        debug("LIMIT 1"); 
+        listAddNodeTail(curStmt->limitList, $2);
+    }
+    | LIMIT expr ',' expr             { 
+        debug("LIMIT 2"); 
+        listAddNodeTail(curStmt->limitList, $2);
+        listAddNodeTail(curStmt->limitList, $4);
+    }
+    ;
 
 opt_into_list: /* nil */ 
    | INTO column_list { debug("INTO %d", $2); }
@@ -452,69 +452,69 @@ select_opts:                          { $$ = 0; }
 
 
 select_expr_list: select_expr {
-		debug("#####%p\n", $1);
-		listAddNodeTail(curStmt->select_expr_list, $1);
-		$$ = 1;
-	}
+        debug("#####%p\n", $1);
+        listAddNodeTail(curStmt->select_expr_list, $1);
+        $$ = 1;
+    }
     | select_expr_list ',' select_expr {
-		debug("#####%p\n", $3);
-		listAddNodeTail(curStmt->select_expr_list, $3);
-		$$ = 1;
-	}
+        debug("#####%p\n", $3);
+        listAddNodeTail(curStmt->select_expr_list, $3);
+        $$ = 1;
+    }
     | '*' { debug("SELECT *");
-		Item *i = calloc(1, sizeof(*i));
-		i->name = strdup("*");
-		i->token1 = NAME;
-		listAddNodeTail(curStmt->select_expr_list, i);
-		$$ = 1;
-	}
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("*");
+        i->token1 = NAME;
+        listAddNodeTail(curStmt->select_expr_list, i);
+        $$ = 1;
+    }
     ;
 
 select_expr: expr opt_as_alias  {
-		debug("SIMPLE SELECT");
-		if ($2) {
-			$1->alias = strdup($2);
-			free($2);
-		}
-		$$ = $1;
-	}
-	;
+        debug("SIMPLE SELECT");
+        if ($2) {
+            $1->alias = strdup($2);
+            free($2);
+        }
+        $$ = $1;
+    }
+    ;
 
 table_references:    table_reference { $$ = 1; }
     | table_references ',' table_reference { $$ = $1 + 1; }
     ;
 
 table_reference:  table_factor
-	| join_table
-	;
+    | join_table
+    ;
 
 table_factor:
     NAME opt_as_alias index_hint 
-	{ debug("TABLE %s", $1);
-		Table *t = calloc(1, sizeof(*t));
-		t->name = strdup($1);
-		free($1);
+    { debug("TABLE %s", $1);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($1);
+        free($1);
 
-		if ($2) {
-			t->alias = strdup($2);
-			free($2);
-		}
+        if ($2) {
+            t->alias = strdup($2);
+            free($2);
+        }
 
-		listAddNodeTail(curStmt->joinList, t);
-	}
-	/* below exists ?*/
+        listAddNodeTail(curStmt->joinList, t);
+    }
+    /* below exists ?*/
   | NAME '.' NAME opt_as_alias index_hint { debug("TABLE %s.%s", $1, $3);
                                free($1); free($3); }
   | table_subquery opt_as NAME {
-		debug("SUBQUERYAS %s", $3);
-		Table *t = calloc(1, sizeof(*t)); 
-		t->sub = $1;
-		if ($3) {
-			t->alias = strdup($3);
-			free($3);
-		}
-		listAddNodeTail(curStmt->joinList, t);
-	}
+        debug("SUBQUERYAS %s", $3);
+        Table *t = calloc(1, sizeof(*t)); 
+        t->sub = $1;
+        if ($3) {
+            t->alias = strdup($3);
+            free($3);
+        }
+        listAddNodeTail(curStmt->joinList, t);
+    }
   | '(' table_references ')' { debug("TABLEREFERENCES %d", $2); }
   ;
 
@@ -524,7 +524,7 @@ opt_as: AS
 
 opt_as_alias: AS NAME { debug ("ALIAS %s", $2); $$=$2 }
   | NAME              { debug ("ALIAS %s", $1); $$=$1 }
-  | /* nil */	{$$ = NULL}
+  | /* nil */    {$$ = NULL}
   ;
 
 join_table:
@@ -580,41 +580,41 @@ opt_for_join: FOR JOIN { $$ = 1; }
    ;
 
 index_list: NAME  { debug("INDEX %s", $1); free($1); $$ = 1; }
-	| index_list ',' NAME { debug("INDEX %s", $3); free($3); $$ = $1 + 1; }
-	;
+    | index_list ',' NAME { debug("INDEX %s", $3); free($3); $$ = $1 + 1; }
+    ;
 
 table_subquery: '(' select_stmt ')' { 
-		debug("SUBQUERY From child %p to father %p", curStmt, curStmt->father); 
-		curStmt = curStmt->father;
-		$$ = $2;
-	}
-	;
+        debug("SUBQUERY From child %p to father %p", curStmt, curStmt->father); 
+        curStmt = curStmt->father;
+        $$ = $2;
+    }
+    ;
 
-	/* statements: delete statement */
-	/* -DELETE */
+    /* statements: delete statement */
+    /* -DELETE */
 stmt: delete_stmt { debug("STMT"); }
-	;
+    ;
 
 delete_reduce_stmt: DELETE {
-		Stmt *stmt = calloc(1, sizeof(*stmt));
-		stmtInit(stmt);
-		if (curStmt) {
-			stmt->father = curStmt;
-		}
-		debug("From %p to child %p", curStmt, stmt);
-		curStmt = stmt;
-	}
-	;
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+    }
+    ;
 delete_stmt: delete_reduce_stmt delete_opts FROM NAME
-	opt_where opt_orderby opt_limit {
-		debug("DELETEONE %d %s", $2, $4);
-		Table *t = calloc(1, sizeof(*t));
-		t->name = strdup($4);
-		free($4);
-		listAddNodeTail(curStmt->joinList, t);
-		curStmt->sql_command = SQLCOM_DELETE;
-	}
-	;
+    opt_where opt_orderby opt_limit {
+        debug("DELETEONE %d %s", $2, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        free($4);
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->sql_command = SQLCOM_DELETE;
+    }
+    ;
 
 delete_opts: delete_opts LOW_PRIORITY { $$ = $1 + 01; }
    | delete_opts QUICK { $$ = $1 + 02; }
@@ -625,7 +625,7 @@ delete_opts: delete_opts LOW_PRIORITY { $$ = $1 + 01; }
 delete_stmt: delete_reduce_stmt delete_opts
     delete_list
     FROM table_references opt_where
-	{ debug("DELETEMULTI %d %d %d", $2, $3, $5); }
+    { debug("DELETEMULTI %d %d %d", $2, $3, $5); }
 
 delete_list: NAME opt_dot_star { debug("TABLE %s", $1); free($1); $$ = 1; }
    | delete_list ',' NAME opt_dot_star
@@ -637,7 +637,7 @@ opt_dot_star: /* nil */ | '.' '*' ;
 delete_stmt: delete_reduce_stmt delete_opts
     FROM delete_list
     USING table_references opt_where
-	{ debug("DELETEMULTI %d %d %d", $2, $4, $6); }
+    { debug("DELETEMULTI %d %d %d", $2, $4, $6); }
 ;
 
    /* statements: insert statement */
@@ -646,15 +646,15 @@ stmt: insert_stmt { debug("STMT"); }
    ;
 
 insert_reduce_stmt: INSERT {
-		Stmt *stmt = calloc(1, sizeof(*stmt));
-		stmtInit(stmt);
-		if (curStmt) {
-			stmt->father = curStmt;
-		}
-		debug("From %p to child %p", curStmt, stmt);
-		curStmt = stmt;
-	}
-	;
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+    }
+    ;
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
      opt_col_names
      VALUES insert_vals_list
@@ -741,28 +741,28 @@ stmt: update_stmt { debug("STMT"); }
    ;
 
 update_reduce_stmt: UPDATE {
-		Stmt *stmt = calloc(1, sizeof(*stmt));
-		stmtInit(stmt);
-		if (curStmt) {
-			stmt->father = curStmt;
-		}
-		debug("From %p to child %p", curStmt, stmt);
-		curStmt = stmt;
-	}
-	;
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+    }
+    ;
 
 update_stmt: update_reduce_stmt
-	update_opts table_references
+    update_opts table_references
     SET update_asgn_list
     opt_where
     opt_orderby
-	opt_limit { debug("UPDATE %d %d %d", $2, $3, $5); 
-		curStmt->sql_command = SQLCOM_UPDATE;	
-	}
-	;
-	/*
-	test_opts: 'z' {debug("hahaah");};
-	*/
+    opt_limit { debug("UPDATE %d %d %d", $2, $3, $5); 
+        curStmt->sql_command = SQLCOM_UPDATE;    
+    }
+    ;
+    /*
+    test_opts: 'z' {debug("hahaah");};
+    */
 
 update_opts: /* nil */ { debug("update_opts"); $$ = 0; }
    | insert_opts LOW_PRIORITY { $$ = $1 | 01 ; }
@@ -770,76 +770,76 @@ update_opts: /* nil */ { debug("update_opts"); $$ = 0; }
    ;
 
 update_asgn_list:
-	NAME COMPARISON expr { 
-		if ($2 != 4) yyerror("bad insert assignment to %s", $1);
-		debug("ASSIGN %s %d", $1, $3);
+    NAME COMPARISON expr { 
+        if ($2 != 4) yyerror("bad insert assignment to %s", $1);
+        debug("ASSIGN %s %d", $1, $3);
 
-		Item *i = calloc(1, sizeof(*i));
-		i->name = strdup($1);
-		free($1);
-		i->token1 = NAME;
-		Item *c = calloc(1, sizeof(*c));
-		c->token1 = COMPARISON;
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($1);
+        free($1);
+        i->token1 = NAME;
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
         c->token2 = $2;
-		c->left = i;
-		c->right = $3;
+        c->left = i;
+        c->right = $3;
 
-		listAddNodeTail(curStmt->updateSetList, c); 
-		$$ = 1;
-	}
-	| NAME '.' NAME COMPARISON expr { 
-		if ($4 != 4) yyerror("bad insert assignment to %s", $1);
-		debug("ASSIGN %s.%s", $1, $3); 
-		Item *i = calloc(1, sizeof(*i));
-		i->prefix = strdup($1);
-		i->name = strdup($3);
-		free($1);
-		free($3);
-		i->token1 = NAME;
-		Item *c = calloc(1, sizeof(*c));
-		c->token1 = COMPARISON;
+        listAddNodeTail(curStmt->updateSetList, c); 
+        $$ = 1;
+    }
+    | NAME '.' NAME COMPARISON expr { 
+        if ($4 != 4) yyerror("bad insert assignment to %s", $1);
+        debug("ASSIGN %s.%s", $1, $3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->prefix = strdup($1);
+        i->name = strdup($3);
+        free($1);
+        free($3);
+        i->token1 = NAME;
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
         c->token2 = $4;
-		c->left = i;
-		c->right = $5;
+        c->left = i;
+        c->right = $5;
 
-		listAddNodeTail(curStmt->updateSetList, c); 
-		$$ = 1; 
-	}
-	| update_asgn_list ',' NAME COMPARISON expr { 
-		if ($4 != 4) yyerror("bad insert assignment to %s", $3);
-		debug("ASSIGN %s.%s", $3); 
-		Item *i = calloc(1, sizeof(*i));
-		i->name = strdup($3);
-		free($3);
-		i->token1 = NAME;
-		Item *c = calloc(1, sizeof(*c));
-		c->token1 = COMPARISON;
+        listAddNodeTail(curStmt->updateSetList, c); 
+        $$ = 1; 
+    }
+    | update_asgn_list ',' NAME COMPARISON expr { 
+        if ($4 != 4) yyerror("bad insert assignment to %s", $3);
+        debug("ASSIGN %s.%s", $3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($3);
+        free($3);
+        i->token1 = NAME;
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
         c->token2 = $4;
-		c->left = i;
-		c->right = $5;
+        c->left = i;
+        c->right = $5;
 
-		listAddNodeTail(curStmt->updateSetList, c); 
-		$$ = $1 + 1;
-	}
-	| update_asgn_list ',' NAME '.' NAME COMPARISON expr { 
-		if ($6 != 4) yyerror("bad insert assignment to %s.$s", $3, $5);
-		debug("ASSIGN %s.%s", $3, $5); 
-		Item *i = calloc(1, sizeof(*i));
-		i->prefix = strdup($3);
-		i->name = strdup($5);
-		free($3);
-		free($5);
-		i->token1 = NAME;
-		Item *c = calloc(1, sizeof(*c));
-		c->token1 = COMPARISON;
+        listAddNodeTail(curStmt->updateSetList, c); 
+        $$ = $1 + 1;
+    }
+    | update_asgn_list ',' NAME '.' NAME COMPARISON expr { 
+        if ($6 != 4) yyerror("bad insert assignment to %s.$s", $3, $5);
+        debug("ASSIGN %s.%s", $3, $5); 
+        Item *i = calloc(1, sizeof(*i));
+        i->prefix = strdup($3);
+        i->name = strdup($5);
+        free($3);
+        free($5);
+        i->token1 = NAME;
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
         c->token2 = $6;
-		c->left = i;
-		c->right = $7;
+        c->left = i;
+        c->right = $7;
 
-		listAddNodeTail(curStmt->updateSetList, c); 
-		$$ = $1 + 1;
-	}
-	;
+        listAddNodeTail(curStmt->updateSetList, c); 
+        $$ = $1 + 1;
+    }
+    ;
 
    /** create database **/
 
@@ -992,290 +992,290 @@ opt_temporary:   /* nil */ { $$ = 0; }
 stmt: set_stmt { debug("STMT"); }
    ;
 
-	/* -SET */
+    /* -SET */
 set_reduce_stmt: SET {
-		Stmt *stmt = calloc(1, sizeof(*stmt));
-		stmtInit(stmt);
-		if (curStmt) {
-			stmt->father = curStmt;
-		}
-		debug("From %p to child %p", curStmt, stmt);
-		curStmt = stmt;
-	}
-	;
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+    }
+    ;
 set_stmt: set_reduce_stmt set_list 
-	{ curStmt->sql_command = SQLCOM_SET_OPTION; }
-	;
+    { curStmt->sql_command = SQLCOM_SET_OPTION; }
+    ;
 
 set_list: set_expr | set_list ',' set_expr ;
 
 set_expr:
-	USERVAR COMPARISON expr { if ($2 != 4) yyerror("bad set to @%s", $1);
-		debug("SET %s", $1); free($1); }
+    USERVAR COMPARISON expr { if ($2 != 4) yyerror("bad set to @%s", $1);
+        debug("SET %s", $1); free($1); }
     | USERVAR ASSIGN expr { debug("SET %s", $1); free($1); }
-	| NAME COMPARISON expr { debug ("SET %s", $1);
-		Item *i = calloc(1, sizeof(*i));
-		i->name = strdup($1);
-		free($1);
-		i->token1 = NAME;
-		Item *c = calloc(1, sizeof(*c));
-		c->token1 = COMPARISON;
+    | NAME COMPARISON expr { debug ("SET %s", $1);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($1);
+        free($1);
+        i->token1 = NAME;
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
         c->token2 = $2;
-		c->left = i;
-		c->right = $3;
+        c->left = i;
+        c->right = $3;
 
-		listAddNodeTail(curStmt->setList, c); 
-	}
+        listAddNodeTail(curStmt->setList, c); 
+    }
     ;
 
-	/* -EXPR */
+    /* -EXPR */
 
 expr: NAME { debug("NAME %s", $1);
-			Item *i = calloc(1, sizeof(Item));
-			i->name = strdup($1);
-			free($1);
-			i->token1 = NAME;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(Item));
+            i->name = strdup($1);
+            free($1);
+            i->token1 = NAME;
+            $$ = i;
+        }
    | USERVAR { debug("USERVAR %s", $1);
-			Item *i = calloc(1, sizeof(*i));
-			i->name = strdup($1);
-			free($1);
-			i->token1 = USERVAR;
-			$$ = i;
-	   }
+            Item *i = calloc(1, sizeof(*i));
+            i->name = strdup($1);
+            free($1);
+            i->token1 = USERVAR;
+            $$ = i;
+       }
    | NAME '.' NAME { debug("FIELDNAME %s.%s", $1, $3); 
-			Item *i = calloc(1, sizeof(*i));
-			i->prefix = strdup($1);
-			i->name = strdup($3);
-			free($1);
-			free($3);
-			i->token1 = NAME;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(*i));
+            i->prefix = strdup($1);
+            i->name = strdup($3);
+            free($1);
+            free($3);
+            i->token1 = NAME;
+            $$ = i;
+        }
    | STRING { debug("STRING %s", $1); 
-			Item *i = calloc(1, sizeof(*i));
-			i->name = strdup($1);
-			free($1);
-			i->token1 = STRING;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(*i));
+            i->name = strdup($1);
+            free($1);
+            i->token1 = STRING;
+            $$ = i;
+        }
    | INTNUM { debug("NUMBER %d", $1); 
-			Item *i = calloc(1, sizeof(*i));
-			i->intNum = $1;
-			i->token1 = INTNUM;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(*i));
+            i->intNum = $1;
+            i->token1 = INTNUM;
+            $$ = i;
+        }
    | APPROXNUM { debug("FLOAT %g", $1); 
-			Item *i = calloc(1, sizeof(*i));
-			i->doubleNum = $1;
-			i->token1 = APPROXNUM;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(*i));
+            i->doubleNum = $1;
+            i->token1 = APPROXNUM;
+            $$ = i;
+        }
    | BOOL { debug("BOOL %d", $1); 
-			Item *i = calloc(1, sizeof(*i));
-			i->intNum = $1;
-			i->token1 = BOOL;
-			$$ = i;
-		}
+            Item *i = calloc(1, sizeof(*i));
+            i->intNum = $1;
+            i->token1 = BOOL;
+            $$ = i;
+        }
    ;
 
 expr: expr '+' expr { debug("ADD"); 
-			Item *i = calloc(1, sizeof(*i));
-			i->token1 = ADD_OP;
-			i->left = $1;
-			i->right = $3;
-			$$ = i;
-	}
+            Item *i = calloc(1, sizeof(*i));
+            i->token1 = ADD_OP;
+            i->left = $1;
+            i->right = $3;
+            $$ = i;
+    }
    | expr '-' expr { debug("SUB"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = SUB_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SUB_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr '*' expr { debug("MUL"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = MUL_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = MUL_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr '/' expr { debug("DIV"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = DIV_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = DIV_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr '%' expr { debug("MOD"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = MOD;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = MOD;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr MOD expr { debug("MOD"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = MOD;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = MOD;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | '-' expr %prec UMINUS { debug("NEG"); 
-		/*TODO*/ 
-		Item *i = calloc(1, sizeof(*i));
-		i->left = $2;
-		$$ = i;
+        /*TODO*/ 
+        Item *i = calloc(1, sizeof(*i));
+        i->left = $2;
+        $$ = i;
    }
    | expr ANDOP expr { debug("AND"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = ANDOP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = ANDOP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    } 
    | expr OR expr { debug("OR"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = OR;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = OR;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr XOR expr { debug("XOR"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = XOR;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = XOR;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr COMPARISON expr { debug("CMP %d ", $2);
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = COMPARISON;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = COMPARISON;
         i->token2 = $2;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
-	}
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
+    }
    | expr COMPARISON '(' select_stmt ')' { debug("CMPSELECT %d", $2); 
-		/* TODO */
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = COMPARISON;
+        /* TODO */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = COMPARISON;
         i->token2 = $2;
-		i->left = $1;
-		i->next = NULL;
-		$$ = i;
+        i->left = $1;
+        i->next = NULL;
+        $$ = i;
    }
    | expr COMPARISON ANY '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    | expr COMPARISON SOME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    | expr COMPARISON ALL '(' select_stmt ')' { debug("CMPALLSELECT %d", $2); }
    | expr '|' expr { debug("BITOR"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = BITOR_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = BITOR_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr '&' expr { debug("BITAND");
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = BITAND_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = BITAND_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr '^' expr { debug("BITXOR"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = BITXOR_OP;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = BITXOR_OP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | expr SHIFT expr { debug("SHIFT %s", $2==1?"left":"right"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = SHIFT;
-		i->left = $1;
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SHIFT;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
    }
    | NOT expr { debug("NOT"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->left = $2;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->left = $2;
+        $$ = i;
    }
    | '!' expr { debug("NOT"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->left = $2;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->left = $2;
+        $$ = i;
    }
    | USERVAR ASSIGN expr { debug("ASSIGN @%s", $1); free($1); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = ASSIGN;
-		i->name = strdup($1);
-		i->right = $3;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = ASSIGN;
+        i->name = strdup($1);
+        i->right = $3;
+        $$ = i;
    }
    | '(' expr ')' {
-		$$ = $2; 
+        $$ = $2; 
    }
    ;
 
 expr:  expr IS NULLX     { debug("ISNULL"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NULLX;
-		i->left = $1;
-		$$ = i;
-	}
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NULLX;
+        i->left = $1;
+        $$ = i;
+    }
    |   expr IS NOT NULLX { debug("ISNULL"); debug("NOT"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->token2 = NULLX;
-		i->left = $1;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->token2 = NULLX;
+        i->left = $1;
+        $$ = i;
    }
    |   expr IS BOOL      { debug("ISBOOL %d", $3); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = BOOL;
-		i->left = $1;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = BOOL;
+        i->left = $1;
+        $$ = i;
    }
    |   expr IS NOT BOOL  { debug("ISBOOL %d", $4); debug("NOT"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->token2 = BOOL;
-		i->left = $1;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->token2 = BOOL;
+        i->left = $1;
+        $$ = i;
    }
    ;
 
 expr: expr BETWEEN expr AND expr %prec BETWEEN { debug("BETWEEN"); 
-		/* TODO */
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = BETWEEN;
-		i->token2 = BOOL;
-		i->left = $1;
-		$$ = i;
-	}
-	;
+        /* TODO */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = BETWEEN;
+        i->token2 = BOOL;
+        i->left = $1;
+        $$ = i;
+    }
+    ;
 
     /* func(a, b, c)
 
         from c -> b ->a -> func
 
-		item(c)
-			right = NULL;
-			left = b
-		item(b)
-			right = c
-			left =  a
-		item(a)
-			right = b
-			left = func
+        item(c)
+            right = NULL;
+            left = b
+        item(b)
+            right = c
+            left =  a
+        item(a)
+            right = b
+            left = func
         item(func)
             right = a
-			left = NULL
-	*/	
+            left = NULL
+    */    
 val_list: expr {
         debug("val_list:expr1 %p %s", $1, $1->name);
         $$ = $1; 
@@ -1284,8 +1284,8 @@ val_list: expr {
         debug("val_list:expr2 %p %s, %p %s", $3, $3->name, $1, $1->name); 
         $3->left = $1;
         $1->right = $3;
-		$$ = $1;
-	}
+        $$ = $1;
+    }
     ;
 
 opt_val_list: /* nil */ { $$ = NULL; }
@@ -1293,158 +1293,158 @@ opt_val_list: /* nil */ { $$ = NULL; }
    ;
 
 expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4); 
-		/* TODO */
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = IN;
-		i->left = $1;
-		i->right = NULL;
-		$$ = i;
-	}
+        /* TODO */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = IN;
+        i->left = $1;
+        i->right = NULL;
+        $$ = i;
+    }
    | expr NOT IN '(' val_list ')'    { debug("ISIN %d", $5); debug("NOT"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->token2 = IN;
-		i->left = $1;
-		i->right = NULL;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->token2 = IN;
+        i->left = $1;
+        i->right = NULL;
+        $$ = i;
    }
    | expr IN '(' select_stmt ')'     { 
-		debug("INSELECT From child %p to father %p", curStmt, curStmt->father); 
-		/* TODO difer with val_list */ 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = IN;
-		i->token2 = SELECT;
-		i->left = $1;
-		i->right = $4;
-		curStmt = curStmt->father;
-		$$ = i;
+        debug("INSELECT From child %p to father %p", curStmt, curStmt->father); 
+        /* TODO difer with val_list */ 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = IN;
+        i->token2 = SELECT;
+        i->left = $1;
+        i->right = $4;
+        curStmt = curStmt->father;
+        $$ = i;
    }
    | expr NOT IN '(' select_stmt ')' {
-		debug("NOTINSELECT From child %p to father %p", curStmt, curStmt->father); 
-		/* TODO difer with val_list */ 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = NOT;
-		i->token1 = SELECT;
-		i->left = $1;
-		i->right = $5;
-		curStmt = curStmt->father;
-		$$ = i;
+        debug("NOTINSELECT From child %p to father %p", curStmt, curStmt->father); 
+        /* TODO difer with val_list */ 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NOT;
+        i->token1 = SELECT;
+        i->left = $1;
+        i->right = $5;
+        curStmt = curStmt->father;
+        $$ = i;
    }
    | EXISTS '(' select_stmt ')'      { debug("EXISTS"); if($1) debug("NOT"); 
-		/* TODO difer with val_list */ 
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = EXISTS;
-		i->right = NULL;
-		$$ = i;
+        /* TODO difer with val_list */ 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = EXISTS;
+        i->right = NULL;
+        $$ = i;
    }
    ;
 
 expr: NAME '(' opt_val_list ')' {
-		debug("CALL %d %s", $3, $1); 
-		Item *i = calloc(1, sizeof(*i));
-		i->name = strdup($1);
-		free($1);
-		i->token1 = NAME;
-		i->right = $3;
-		$$ = i;
-	}
-	;
+        debug("CALL %d %s", $3, $1); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($1);
+        free($1);
+        i->token1 = NAME;
+        i->right = $3;
+        $$ = i;
+    }
+    ;
 
   /* functions with special syntax */
-expr: FCOUNT '(' '*' ')'	{ 
-		debug("COUNTALL");
-		Item *i = calloc(1, sizeof(*i));
-		i->name = "*";
-		i->token1 = FCOUNT;
-		$$ = i;
-	}
-	| FCOUNT '(' expr ')'	{ 
-		debug(" CALL COUNT");
-		Item *i = calloc(1, sizeof(*i));
-		i->right = $3;
-		i->token1 = FCOUNT;
-		$$ = i;
-	}
-	| FSUM '(' '*' ')'		{
-		debug("SUMALL");
-		Item *i = calloc(1, sizeof(*i));
-		i->name = "*";
-		i->token1 = FSUM;
-		$$ = i;
-	}
-	| FSUM '(' expr ')'		{ 
-		debug("CALL SUM");
-		Item *i = calloc(1, sizeof(*i));
-		i->right = $3;
-		i->token1 = FSUM;
-		$$ = i;
-	}
-	| FAVG '(' '*' ')'		{
-		debug ("AVGALL");
-		Item *i = calloc(1, sizeof(*i));
-		i->name = "*";
-		i->token1 = FAVG;
-		$$ = i;
-	}
-	| FAVG '(' expr ')'		{
-		debug ("CALL AVG"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->right = $3;
-		i->token1 = FAVG;
-		$$ = i;
-	}
-	| FADDDATE '(' expr ')'			{ debug ("ADDDATE") }
-	| FSUBDATE '(' expr ')'			{ debug ("SUBDATE") }
-	| FBIT_AND '(' expr ')'			{ debug ("BIT") }
-	| FBIT_OR '(' expr ')'			{ debug ("BIT") }
-	| FBIT_XOR FBIT_CAST	'(' expr ')'	{ debug ("BIT") }
-	| FCURDATE '(' ')'			{ 
-		debug ("CURDATE");
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = FCURDATE;
-		$$ = i;
-	}
-	| FCURTIME '(' ')'			{
-		debug ("CURTIME");
-		Item *i = calloc(1, sizeof(*i));
-		i->token1 = FCURDATE;
-		$$ = i;
-	}
-	| FEXTRACT '(' expr ')'			{ debug ("EXTRACT") }
-	| FGROUP_CONCAT	'(' expr ')'	{ debug ("GROUP_CONCAT") }
-	| FMAX '(' expr ')'				{ debug ("MAX") }
-	| FMID '(' expr ')'				{ debug ("MID") }
-	| FMIN '(' expr ')'				{ debug ("MIN") }
-	| FNOW '(' expr ')'				{ debug ("NOW") }
-	| FPOSITION '(' expr ')'			{ debug ("POSITION") }
-	| FSESSION_USER '(' expr ')'		{ debug ("SESSION_USER") }
-	| FSTD '(' expr ')'				{ debug ("STD") }
-	| FSTDDEV '(' expr ')'			{ debug ("STDDEV") }
-	| FSTDDEV_POP '(' expr ')'		{ debug ("STDDEV_POP") }
-	| FSTDDEV_SAMP '(' expr ')'		{ debug ("STDDEV_SAMP") }
-	| FSYSDATE '(' expr ')'			{ debug ("SYSDATE") }
-	| FSYSTEM_USER '(' expr ')'		{ debug ("SYSTEM_USER") }
-	| FVARIANCE '(' expr ')'			{ debug ("VARIANCE") }
-	| FVAR_POP '(' expr ')'			{ debug ("VAR_POP") }
-	| FVAR_SAMP '(' expr ')'			{ debug ("VAR_SAMP") }
-	;
+expr: FCOUNT '(' '*' ')'    { 
+        debug("COUNTALL");
+        Item *i = calloc(1, sizeof(*i));
+        i->name = "*";
+        i->token1 = FCOUNT;
+        $$ = i;
+    }
+    | FCOUNT '(' expr ')'    { 
+        debug(" CALL COUNT");
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FCOUNT;
+        $$ = i;
+    }
+    | FSUM '(' '*' ')'        {
+        debug("SUMALL");
+        Item *i = calloc(1, sizeof(*i));
+        i->name = "*";
+        i->token1 = FSUM;
+        $$ = i;
+    }
+    | FSUM '(' expr ')'        { 
+        debug("CALL SUM");
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FSUM;
+        $$ = i;
+    }
+    | FAVG '(' '*' ')'        {
+        debug ("AVGALL");
+        Item *i = calloc(1, sizeof(*i));
+        i->name = "*";
+        i->token1 = FAVG;
+        $$ = i;
+    }
+    | FAVG '(' expr ')'        {
+        debug ("CALL AVG"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FAVG;
+        $$ = i;
+    }
+    | FADDDATE '(' expr ')'            { debug ("ADDDATE") }
+    | FSUBDATE '(' expr ')'            { debug ("SUBDATE") }
+    | FBIT_AND '(' expr ')'            { debug ("BIT") }
+    | FBIT_OR '(' expr ')'            { debug ("BIT") }
+    | FBIT_XOR FBIT_CAST    '(' expr ')'    { debug ("BIT") }
+    | FCURDATE '(' ')'            { 
+        debug ("CURDATE");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FCURDATE;
+        $$ = i;
+    }
+    | FCURTIME '(' ')'            {
+        debug ("CURTIME");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FCURDATE;
+        $$ = i;
+    }
+    | FEXTRACT '(' expr ')'            { debug ("EXTRACT") }
+    | FGROUP_CONCAT    '(' expr ')'    { debug ("GROUP_CONCAT") }
+    | FMAX '(' expr ')'                { debug ("MAX") }
+    | FMID '(' expr ')'                { debug ("MID") }
+    | FMIN '(' expr ')'                { debug ("MIN") }
+    | FNOW '(' expr ')'                { debug ("NOW") }
+    | FPOSITION '(' expr ')'            { debug ("POSITION") }
+    | FSESSION_USER '(' expr ')'        { debug ("SESSION_USER") }
+    | FSTD '(' expr ')'                { debug ("STD") }
+    | FSTDDEV '(' expr ')'            { debug ("STDDEV") }
+    | FSTDDEV_POP '(' expr ')'        { debug ("STDDEV_POP") }
+    | FSTDDEV_SAMP '(' expr ')'        { debug ("STDDEV_SAMP") }
+    | FSYSDATE '(' expr ')'            { debug ("SYSDATE") }
+    | FSYSTEM_USER '(' expr ')'        { debug ("SYSTEM_USER") }
+    | FVARIANCE '(' expr ')'            { debug ("VARIANCE") }
+    | FVAR_POP '(' expr ')'            { debug ("VAR_POP") }
+    | FVAR_SAMP '(' expr ')'            { debug ("VAR_SAMP") }
+    ;
 
 expr: FSUBSTRING '(' val_list ')' {
         debug("CALL SUBSTR");
-		Item *i = calloc(1, sizeof(*i));
-		i->right = $3;
-		i->token1 = FSUBSTRING;
-		$$ = i;
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FSUBSTRING;
+        $$ = i;
     }
     | FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
     | FSUBSTRING '(' expr FROM expr FOR expr ')' {  debug("CALL 3 SUBSTR"); }
     | FTRIM '(' val_list ')' { 
-		debug("CALL TRIM"); 
-		Item *i = calloc(1, sizeof(*i));
-		i->right = $3;
-		i->token1 = FTRIM;
-		$$ = i;
-	}
+        debug("CALL TRIM"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FTRIM;
+        $$ = i;
+    }
     | FTRIM '(' trim_ltb expr FROM val_list ')' { debug("CALL 3 TRIM"); }
     ;
 
@@ -1487,8 +1487,8 @@ expr: expr REGEXP expr { debug("REGEXP"); }
    ;
 
 expr: CURRENT_TIMESTAMP { debug("NOW") };
-   | CURRENT_DATE	{ debug("NOW") };
-   | CURRENT_TIME	{ debug("NOW") };
+   | CURRENT_DATE    { debug("NOW") };
+   | CURRENT_TIME    { debug("NOW") };
    ;
 
 expr: BINARY expr %prec UMINUS { debug("STRTOBIN"); }
