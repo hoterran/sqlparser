@@ -97,6 +97,7 @@ enum SqlStep {
 	GroupStep = 3,
 	OrderStep = 4,
 	LimitStep = 5,
+    UsingStep = 6
 };
 
 typedef struct Stmt_t {

@@ -7,11 +7,13 @@
 #include <string.h>
 #include <stdio.h>
 
+/* TODO revert to hash table */
+
 char* tmp(int cmp) {
     if (cmp == 4)
         return "=";
     else if (cmp == 12)
-        return "<=>";
+        return "!=";
     else if (cmp == 6)
         return ">=";
     else if (cmp == 2)
@@ -22,6 +24,22 @@ char* tmp(int cmp) {
         return "<";
     else if (cmp == 3)
         return "<>";
+    else if (cmp == SUB_OP)
+        return "-";
+    else if (cmp == ADD_OP)
+        return "+";
+    else if (cmp == MUL_OP)
+        return "*";
+    else if (cmp == DIV_OP)
+        return "/";
+    else if (cmp == LIKE)
+        return "LIKE";
+    else if (cmp == REGEXP)
+        return "REGEXP";
+    else if (cmp == NOT) 
+        return "NOT";
+    else if (cmp == NULLX) 
+        return "NULLX";
     else
         assert(NULL);
 }
@@ -122,6 +140,18 @@ void print_expr_item(Item *i, int indent) {
 
             if (i->alias)
                 zprintf(indent, " AS %s", i->alias);
+        } else if ((i->token1 == ADD_OP)
+            || (i->token1 == SUB_OP)
+            || (i->token1 == DIV_OP)
+            || (i->token1 == MUL_OP)
+        ) {
+            print_expr_item(i->left, indent);
+            if (i->token2)
+                printf(" %s ", tmp(i->token2));
+            printf(" %s ", tmp(i->token1));
+            print_expr_item(i->right, 0);
+        } else {
+            assert(NULL); 
         }
     }
 }
@@ -154,13 +184,43 @@ void print_expr_stmt(Item *i, int indent) {
             print_expr_item(i->left, indent);
             printf(" %s ", tmp(i->token2));
             print_expr_item(i->right, 0);
+        } else if ((i->token1 == NULLX)) {
+            print_expr_item(i->left, indent);
+            if (i->token2 == NOT) 
+                printf(" IS NOT");
+            else if (i->token2 == 0)
+                printf(" IS ");
+            else 
+                printf(" %s ", tmp(i->token2));
+
+            printf(" %s ", tmp(i->token1));
         } else if ((i->token1 == IN) && (i->token2 == SELECT)) {
+            /* in ( select... ) */
             print_expr_item(i->left, indent);
             printf("\n");
             zprintf(indent,"IN (\n ");
             Stmt *ir = i->right;
             stmt(ir, indent + 1);
             zprintf(indent,")");
+        } else if ((i->token1 == IN) && (i->token2 == 0)) {
+            /* in (1, 2, 3) */
+            print_expr_item(i->left, indent);
+            printf("\n");
+            zprintf(indent,"IN (\n ");
+            Item *ir = i->right;
+            print_expr_item(ir, indent + 1);
+            printf("\n");
+            zprintf(indent,")");
+        } else if ((i->token1 == LIKE)
+            || (i->token1 == REGEXP)
+        ) {
+            print_expr_item(i->left, indent);
+            if (i->token2)
+                printf(" %s ", tmp(i->token2));
+            printf(" %s ", tmp(i->token1));
+            print_expr_item(i->right, 0);
+        } else {
+           assert(NULL); 
         }
     } 
 }    

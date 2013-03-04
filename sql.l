@@ -250,7 +250,10 @@ ZEROFILL    { return ZEROFILL; }
     /* one line comment */
 
 "--".*\n ;
-    /* for normalize sql*/
+    /* 
+        take care this only for rds normalize sql, 
+        other user remove below 
+    */
 ":" ;
 
    /* numbers */
@@ -341,16 +344,17 @@ VAR_SAMP/"("        { return FVAR_SAMP; }
      * peek ahead and return function if name(
      * below not keyword
     */
-
-count { int c = input(); unput(c);
+    /*
+COUNT[ ]+ { int c = input(); unput(c);
            if(c == '(') return FCOUNT;
            yylval.strval = strdup(yytext);
+           printf("[%s]", yytext);
            return NAME; }
-sum    { int c = input(); unput(c);
+SUM[ ]+    { int c = input(); unput(c);
            if(c == '(') return FSUM;
            yylval.strval = strdup(yytext);
            return NAME; }
-
+    */
 [A-Za-z][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
                           return NAME; }
 `[^`/\\.\n]+`           { yylval.strval = strdup(yytext+1);

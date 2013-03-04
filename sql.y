@@ -560,9 +560,16 @@ opt_left_or_right_outer: LEFT opt_outer { $$ = 1 + $2; }
 
 opt_join_condition: join_condition | /* nil */ ;
 
+reduce_using: USING {
+        curStmt->step = UsingStep;  
+    }
+
 join_condition:
-    ON expr { debug("ONEXPR"); }
-    | USING '(' column_list ')' { debug("USING %d", $3); }
+    ON expr {
+        debug("ONEXPR");
+        listAddNodeTail(curStmt->whereList, $2); 
+    }
+    | reduce_using '(' column_list ')' { debug("USING %d", $3); }
     ;
 
 index_hint:
@@ -1229,8 +1236,18 @@ expr:  expr IS NULLX     { debug("ISNULL");
     }
    |   expr IS NOT NULLX { debug("ISNULL"); debug("NOT"); 
         Item *i = calloc(1, sizeof(*i));
-        i->token1 = NOT;
-        i->token2 = NULLX;
+        i->token1 = NULLX;
+        i->token2 = NOT;
+        i->left = $1;
+        $$ = i;
+   }
+   | expr COMPARISON NULLX {
+        debug(" = NULL or != NULL");
+        if (($2 != 4) && ($2 != 12 )) yyerror("bad nullx to %d", $2);
+        /* only = and != */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NULLX;
+        i->token2 = $2;
         i->left = $1;
         $$ = i;
    }
@@ -1297,7 +1314,7 @@ expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4);
         Item *i = calloc(1, sizeof(*i));
         i->token1 = IN;
         i->left = $1;
-        i->right = NULL;
+        i->right = $4;
         $$ = i;
     }
    | expr NOT IN '(' val_list ')'    { debug("ISIN %d", $5); debug("NOT"); 
@@ -1305,7 +1322,7 @@ expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4);
         i->token1 = NOT;
         i->token2 = IN;
         i->left = $1;
-        i->right = NULL;
+        i->right = $5;
         $$ = i;
    }
    | expr IN '(' select_stmt ')'     { 
@@ -1478,13 +1495,41 @@ case_list: WHEN expr THEN expr     { $$ = 1; }
          | case_list WHEN expr THEN expr { $$ = $1+1; } 
    ;
 
-expr: expr LIKE expr { debug("LIKE"); }
-   | expr NOT LIKE expr { debug("LIKE"); debug("NOT"); }
-   ;
+expr: expr LIKE expr { 
+        debug("LIKE");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = LIKE;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
+    }
+    | expr NOT LIKE expr { 
+        debug("LIKE"); debug("NOT"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = LIKE;
+        i->token2 = NOT;
+        i->left = $1;
+        i->right = $4;
+        $$ = i;
+    };
 
-expr: expr REGEXP expr { debug("REGEXP"); }
-   | expr NOT REGEXP expr { debug("REGEXP"); debug("NOT"); }
-   ;
+expr: expr REGEXP expr {
+        debug("REGEXP");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = REGEXP;
+        i->left = $1;
+        i->right = $3;
+        $$ = i;
+    }
+    | expr NOT REGEXP expr { 
+        debug("REGEXP"); debug("NOT"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = REGEXP;
+        i->token2 = NOT;
+        i->left = $1;
+        i->right = $4;
+        $$ = i;
+    };
 
 expr: CURRENT_TIMESTAMP { debug("NOW") };
    | CURRENT_DATE    { debug("NOW") };
@@ -1500,9 +1545,9 @@ void debug(char *s, ...) {
   va_list ap;
   va_start(ap, s);
 
-  //printf("rpn: ");
-  //vfprintf(stdout, s, ap);
-  //printf("\n");
+  printf("rpn: ");
+  vfprintf(stdout, s, ap);
+  printf("\n");
 }
 
 void
