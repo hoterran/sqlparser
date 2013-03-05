@@ -363,6 +363,76 @@ void orderby(Stmt *stmt, int indent) {
     }
 }
 
+void insertColumn(Stmt *stmt, int indent) {
+    listIter *iter, *auxIter;
+    listNode *node, *auxNode;
+
+    if (stmt->insertList && listLength(stmt->insertList)) {
+        /* print order */
+        iter = listGetIterator(stmt->insertList, AL_START_HEAD);
+        zprintf(indent,"(\n");
+        indent++;
+        //zprintf(indent,"order(%d) => \n", listLength(stmt->orderList));
+        while ((node = listNext(iter)) != NULL) {
+            Item *i = listNodeValue(node);
+            print_expr_item(i, indent);
+            if (listNextNode(node)) 
+                printf(",\n");
+            else
+                printf("\n");
+        }
+        indent--;
+        zprintf(indent, ")\n");
+        
+        listReleaseIterator(iter);
+        //listRelease(stmt->orderList);
+    }
+}
+    /*
+        1.
+            list (1,2), (3, 4)
+                list (1,2)
+                    item 1
+                    item 2
+                list (3, 4)
+                    item 3
+                    item 4
+        2. select
+
+    */
+void valueColumn(Stmt *st, int indent) {
+    listIter *iter, *auxIter;
+    listNode *node, *auxNode;
+
+    if (st->valueSelect) {
+        stmt(st->valueSelect, indent); 
+    };
+
+    if (st->valueList && listLength(st->valueList)) {
+        /* print order */
+        iter = listGetIterator(st->valueList, AL_START_HEAD);
+        zprintf(indent,"VALUES\n");
+        indent++;
+        //zprintf(indent,"order(%d) => \n", listLength(stmt->orderList));
+        while ((node = listNext(iter)) != NULL) {
+            list *l = listNodeValue(node);
+            auxIter = listGetIterator(l, AL_START_HEAD);
+            zprintf(indent, "(");
+            while ((auxNode = listNext(auxIter)) != NULL) {
+                Item *i = listNodeValue(auxNode);
+                print_expr_item(i, 0);
+                if (listNextNode(auxNode))
+                    printf(",");
+            }
+            if (listNextNode(node))
+                zprintf(0, "),\n");
+        }
+        zprintf(0, ")\n");
+        
+        listReleaseIterator(iter);
+    }
+}
+
 void limit(Stmt *stmt, int indent) {
     listIter *iter, *auxIter;
     listNode *node, *auxNode;
@@ -458,8 +528,10 @@ void table(Stmt *st, int indent) {
 
     if (st->joinList && listLength(st->joinList)) {
         iter = listGetIterator(st->joinList, AL_START_HEAD);
-
-        if (st->sql_command != SQLCOM_UPDATE) {
+        /* select and delete has FROM keyword */
+        if ((st->sql_command == SQLCOM_SELECT) ||
+            (st->sql_command == SQLCOM_DELETE)
+            ) {
             zprintf(indent, "FROM\n");
         };
         indent++;
@@ -498,6 +570,9 @@ void stmtInit(Stmt *stmt) {
     stmt->updateSetList = listCreate();
     stmt->select_expr_list = listCreate();
     stmt->whereList = listCreate();
+    stmt->insertList = listCreate();
+    stmt->valueList  = listCreate();
+    stmt->usingList = listCreate();
 }
 
 void stmt(Stmt *stmt, int indent) {
@@ -532,6 +607,12 @@ void stmt(Stmt *stmt, int indent) {
             where(stmt, indent);
             limit(stmt, indent);
             break;
+        case SQLCOM_INSERT:
+            zprintf(indent,"INSERT INTO \n");
+            table(stmt, indent);
+            insertColumn(stmt, indent);
+            valueColumn(stmt, indent);
+            
         default:
         break;
     }

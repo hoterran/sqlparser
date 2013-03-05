@@ -95,3 +95,10 @@ Core structure is `Stmt` and `Item` in sql.h
 					c
 			)
 		)
+
+
+
+## TODO
+
+    * out,left,right join
+    * union

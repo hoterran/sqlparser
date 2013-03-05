@@ -97,7 +97,9 @@ enum SqlStep {
 	GroupStep = 3,
 	OrderStep = 4,
 	LimitStep = 5,
-    UsingStep = 6
+    UsingStep = 6,
+    InsertColumnStep = 7,
+    ValueColumnStep = 8
 };
 
 typedef struct Stmt_t {
@@ -112,10 +114,18 @@ typedef struct Stmt_t {
 	list *orderList;
 	list *whereList; // x = y (list1) and m=n(list2) [list1 and list2]
 	list *limitList;
-	/**/
+    list *usingList;
+	/* set */
 	list *setList;
-	list *tmpList;
+    /* update */
 	list *updateSetList;
+
+    /* insert */
+    list *insertList;
+    list *valueList;
+    list *valueChildList;
+    struct Stmt_t *valueSelect;
+
 	struct Stmt_t *father;
 } Stmt;
 

@@ -343,7 +343,7 @@ select_reduce_stmt: SELECT {
         if (curStmt) {
             stmt->father = curStmt;
         }
-        debug("From %p to child %p", curStmt, stmt);
+        debug("select From %p to child %p", curStmt, stmt);
         curStmt = stmt;
     };
 
@@ -435,8 +435,35 @@ opt_into_list: /* nil */
    | INTO column_list { debug("INTO %d", $2); }
    ;
 
-column_list: NAME { debug("COLUMN %s", $1); free($1); $$ = 1; }
-  | column_list ',' NAME  { debug("COLUMN %s", $3); free($3); $$ = $1 + 1; }
+    /* using, insert column, create */
+column_list: NAME {
+        debug("COLUMN %s", $1); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($1);
+        i->token1 = NAME;
+        if (curStmt->step == InsertColumnStep) {
+            listAddNodeTail(curStmt->insertList, i); 
+        } else if (curStmt->step == UsingStep) {
+            listAddNodeTail(curStmt->usingList, i); 
+        }
+
+        free($1);
+        $$ = 1; 
+    }
+    | column_list ',' NAME  {
+        debug("COLUMN %s", $3);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($3);
+        i->token1 = NAME;
+        if (curStmt->step == InsertColumnStep) {
+            listAddNodeTail(curStmt->insertList, i); 
+        } else if (curStmt->step == UsingStep) {
+            listAddNodeTail(curStmt->usingList, i); 
+        }
+
+        free($3);
+        $$ = $1 + 1;
+    }
   ;
 
 select_opts:                          { $$ = 0; }
@@ -503,9 +530,10 @@ table_factor:
         listAddNodeTail(curStmt->joinList, t);
     }
     /* below exists ?*/
-  | NAME '.' NAME opt_as_alias index_hint { debug("TABLE %s.%s", $1, $3);
-                               free($1); free($3); }
-  | table_subquery opt_as NAME {
+    | NAME '.' NAME opt_as_alias index_hint { 
+        debug("TABLE %s.%s", $1, $3);
+        free($1); free($3); }
+    | table_subquery opt_as NAME {
         debug("SUBQUERYAS %s", $3);
         Table *t = calloc(1, sizeof(*t)); 
         t->sub = $1;
@@ -515,8 +543,8 @@ table_factor:
         }
         listAddNodeTail(curStmt->joinList, t);
     }
-  | '(' table_references ')' { debug("TABLEREFERENCES %d", $2); }
-  ;
+    | '(' table_references ')' { debug("TABLEREFERENCES %d", $2); }
+    ;
 
 opt_as: AS 
   | /* nil */
@@ -541,22 +569,22 @@ join_table:
   ;
 
 opt_inner_cross: /* nil */ { $$ = 0; }
-   | INNER { $$ = 1; }
-   | CROSS  { $$ = 2; }
-;
+    | INNER { $$ = 1; }
+    | CROSS  { $$ = 2; }
+    ;
 
 opt_outer: /* nil */  { $$ = 0; }
-   | OUTER {$$ = 4; }
-   ;
+    | OUTER {$$ = 4; }
+    ;
 
 left_or_right: LEFT { $$ = 1; }
     | RIGHT { $$ = 2; }
     ;
 
 opt_left_or_right_outer: LEFT opt_outer { $$ = 1 + $2; }
-   | RIGHT opt_outer  { $$ = 2 + $2; }
-   | /* nil */ { $$ = 0; }
-   ;
+    | RIGHT opt_outer  { $$ = 2 + $2; }
+    | /* nil */ { $$ = 0; }
+    ;
 
 opt_join_condition: join_condition | /* nil */ ;
 
@@ -608,7 +636,7 @@ delete_reduce_stmt: DELETE {
         if (curStmt) {
             stmt->father = curStmt;
         }
-        debug("From %p to child %p", curStmt, stmt);
+        debug("delete From %p to child %p", curStmt, stmt);
         curStmt = stmt;
     }
     ;
@@ -645,12 +673,12 @@ delete_stmt: delete_reduce_stmt delete_opts
     FROM delete_list
     USING table_references opt_where
     { debug("DELETEMULTI %d %d %d", $2, $4, $6); }
-;
+    ;
 
    /* statements: insert statement */
 
 stmt: insert_stmt { debug("STMT"); }
-   ;
+    ;
 
 insert_reduce_stmt: INSERT {
         Stmt *stmt = calloc(1, sizeof(*stmt));
@@ -658,19 +686,33 @@ insert_reduce_stmt: INSERT {
         if (curStmt) {
             stmt->father = curStmt;
         }
-        debug("From %p to child %p", curStmt, stmt);
+        debug("insert From %p to child %p", curStmt, stmt);
+        stmt->sql_command = SQLCOM_INSERT;
+        stmt->step = InsertColumnStep;
         curStmt = stmt;
-    }
-    ;
+    };
+
+insert_value_reduct_stmt: VALUES {
+        curStmt->step = ValueColumnStep;
+        curStmt->valueChildList = listCreate();
+    };
+
+    /* insert ... values() */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
      opt_col_names
-     VALUES insert_vals_list
-     opt_ondupupdate { debug("INSERTVALS %d %d %s", $2, $7, $4); free($4) }
-   ;
+     insert_value_reduct_stmt insert_vals_list
+     opt_ondupupdate {
+        debug("INSERTVALS %d %d %s", $2, $7, $4); 
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        free($4);
+        listAddNodeTail(curStmt->joinList, t);
+    }
+    ;
 
 opt_ondupupdate: /* nil */
-   | ONDUPLICATE KEY UPDATE insert_asgn_list { debug("DUPUPDATE %d", $4); }
-   ;
+    | ONDUPLICATE KEY UPDATE insert_asgn_list { debug("DUPUPDATE %d", $4); }
+    ;
 
 insert_opts: /* nil */ { $$ = 0; }
    | insert_opts LOW_PRIORITY { $$ = $1 | 01 ; }
@@ -682,30 +724,54 @@ insert_opts: /* nil */ { $$ = 0; }
 opt_into: INTO | /* nil */
    ;
 
+        /* insert, replace */
 opt_col_names: /* nil */
    | '(' column_list ')' { debug("INSERTCOLS %d", $2); }
    ;
 
-insert_vals_list: '(' insert_vals ')' { debug("VALUES %d", $2); $$ = 1; }
-   | insert_vals_list ',' '(' insert_vals ')' { debug("VALUES %d", $4); $$ = $1 + 1; }
+insert_vals_list: '(' insert_vals ')' {
+        debug("VALUES %d", $2); $$ = 1;
+        listAddNodeTail(curStmt->valueList, curStmt->valueChildList);  
+        curStmt->valueChildList = listCreate();
+    }
+    | insert_vals_list ',' '(' insert_vals ')' { 
+        debug("VALUES %d", $4); $$ = $1 + 1; 
+        listAddNodeTail(curStmt->valueList, curStmt->valueChildList);  
+        curStmt->valueChildList = listCreate();
+    };
 
 insert_vals:
-     expr { $$ = 1; }
-   | DEFAULT { debug("DEFAULT"); $$ = 1; }
-   | insert_vals ',' expr { $$ = $1 + 1; }
-   | insert_vals ',' DEFAULT { debug("DEFAULT"); $$ = $1 + 1; }
-   ;
+    expr {
+        listAddNodeTail(curStmt->valueChildList, $1);
+        $$ = 1;
+    }
+    | DEFAULT { debug("DEFAULT"); $$ = 1;}
+    | insert_vals ',' expr {
+        $$ = $1 + 1;
+        listAddNodeTail(curStmt->valueChildList, $3);
+    }
+    | insert_vals ',' DEFAULT { debug("DEFAULT"); $$ = $1 + 1; }
+    ;
 
+    /* what is it? */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
     SET insert_asgn_list
     opt_ondupupdate
-     { debug("INSERTASGN %d %d %s", $2, $6, $4); free($4) }
-   ;
+    { debug("INSERTASGN %d %d %s", $2, $6, $4); free($4) }
+    ;
 
+    /* insert ... select */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME opt_col_names
     select_stmt
-    opt_ondupupdate { debug("INSERTSELECT %d %s", $2, $4); free($4); }
-  ;
+    opt_ondupupdate {
+        debug("INSERTSELECT %d %s From child %p to father %p", $2, $4, curStmt, curStmt->father);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        free($4);
+        curStmt = curStmt->father;
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->valueSelect = $6;
+    };
 
 insert_asgn_list:
      NAME COMPARISON expr 
@@ -753,7 +819,7 @@ update_reduce_stmt: UPDATE {
         if (curStmt) {
             stmt->father = curStmt;
         }
-        debug("From %p to child %p", curStmt, stmt);
+        debug("update From %p to child %p", curStmt, stmt);
         curStmt = stmt;
     }
     ;
@@ -1006,7 +1072,7 @@ set_reduce_stmt: SET {
         if (curStmt) {
             stmt->father = curStmt;
         }
-        debug("From %p to child %p", curStmt, stmt);
+        debug("set From %p to child %p", curStmt, stmt);
         curStmt = stmt;
     }
     ;
