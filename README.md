@@ -15,7 +15,12 @@ Core structure is `Stmt` and `Item` in sql.h
 	make
 
 ## use
+
+### format sql
 	./format your_sql_file
+
+### create index for this sql
+	./index your_sql_file
 
 ### example
 
@@ -95,6 +100,12 @@ Core structure is `Stmt` and `Item` in sql.h
 					c
 			)
 		)
+
+	hoterran@hoterran-laptop:~/Projects/sqlparser$ cat test/test_index.sql 
+	select * from aaa a, bbb b where a.id = 1 and a.name = "aaaa" and a.kkk = "zzz" and b.id = a.id;
+	hoterran@hoterran-laptop:~/Projects/sqlparser$ ./index test/test_index.sql 
+	create index index_aaa_id_name_kkk on aaa(id, name, kkk);
+	create index index_bbb_id on bbb(id);
 
 
 

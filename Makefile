@@ -3,12 +3,17 @@ CC = gcc -g
 LEX = flex
 YACC = bison
 
-all:format
+all:format index
 
 format:	sql.tab.o sql.o adlist.o format.o
 	${CC} -o format format.o sql.tab.o sql.o adlist.o
 
 format.o:format.c
+
+index: sql.tab.o sql.o adlist.o index.o
+	${CC} -o index index.o sql.tab.o sql.o adlist.o
+
+index.o:index.c
 
 sql.tab.o:CFLAGS += -DYYDEBUG
 
