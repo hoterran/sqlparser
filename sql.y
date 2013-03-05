@@ -692,7 +692,8 @@ insert_reduce_stmt: INSERT {
         curStmt = stmt;
     };
 
-insert_value_reduct_stmt: VALUES {
+    /* reduce */
+insert_value_reduce_stmt: VALUES {
         curStmt->step = ValueColumnStep;
         curStmt->valueChildList = listCreate();
     };
@@ -700,7 +701,7 @@ insert_value_reduct_stmt: VALUES {
     /* insert ... values() */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
      opt_col_names
-     insert_value_reduct_stmt insert_vals_list
+     insert_value_reduce_stmt insert_vals_list
      opt_ondupupdate {
         debug("INSERTVALS %d %d %s", $2, $7, $4); 
         Table *t = calloc(1, sizeof(*t));
@@ -790,28 +791,57 @@ insert_asgn_list:
 
    /** replace just like insert **/
 stmt: replace_stmt { debug("STMT"); }
-   ;
+    ;
 
-replace_stmt: REPLACE insert_opts opt_into NAME
+replace_reduce_stmt: REPLACE {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("replace From %p to child %p", curStmt, stmt);
+        stmt->sql_command = SQLCOM_REPLACE;
+        stmt->step = InsertColumnStep;
+        curStmt = stmt;
+    };
+    /* reduce */
+replace_value_reduce_stmt: VALUES {
+        curStmt->step = ValueColumnStep;
+        curStmt->valueChildList = listCreate();
+    };
+
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
      opt_col_names
-     VALUES insert_vals_list
-     opt_ondupupdate { debug("REPLACEVALS %d %d %s", $2, $7, $4); free($4) }
-   ;
+     replace_value_reduce_stmt insert_vals_list
+     opt_ondupupdate {
+        debug("REPLACEVALS %d %d %s", $2, $7, $4); 
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        free($4);
+        listAddNodeTail(curStmt->joinList, t);
+    };
 
-replace_stmt: REPLACE insert_opts opt_into NAME
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
     SET insert_asgn_list
     opt_ondupupdate
      { debug("REPLACEASGN %d %d %s", $2, $6, $4); free($4) }
    ;
 
-replace_stmt: REPLACE insert_opts opt_into NAME opt_col_names
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME opt_col_names
     select_stmt
-    opt_ondupupdate { debug("REPLACESELECT %d %s", $2, $4); free($4); }
-  ;
+    opt_ondupupdate {
+        debug("REPLACESELECT %d %s From child %p to father %p", $2, $4, curStmt, curStmt->father);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        free($4);
+        curStmt = curStmt->father;
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->valueSelect = $6;
+    };
 
-/** -UPDATE **/
+    /** -UPDATE **/
 stmt: update_stmt { debug("STMT"); }
-   ;
+    ;
 
 update_reduce_stmt: UPDATE {
         Stmt *stmt = calloc(1, sizeof(*stmt));

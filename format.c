@@ -608,13 +608,19 @@ void stmt(Stmt *stmt, int indent) {
             limit(stmt, indent);
             break;
         case SQLCOM_INSERT:
-            zprintf(indent,"INSERT INTO \n");
+            zprintf(indent,"INSERT INTO\n");
             table(stmt, indent);
             insertColumn(stmt, indent);
             valueColumn(stmt, indent);
-            
+            break;
+        case SQLCOM_REPLACE:
+            zprintf(indent,"REPLACE INTO\n");
+            table(stmt, indent);
+            insertColumn(stmt, indent);
+            valueColumn(stmt, indent);
+            break; 
         default:
-        break;
+            break;
     }
 }
 
