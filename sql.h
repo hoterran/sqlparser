@@ -132,6 +132,7 @@ typedef struct Stmt_t {
 typedef struct Table_t {
 	char *name;
 	char *alias;
+    char *db;
     struct Stmt_t *sub; /* sub_query */
 } Table;
 

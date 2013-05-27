@@ -3,12 +3,17 @@ CC = gcc -g
 LEX = flex
 YACC = bison
 
-all:format index
+all:format index format_str
 
-format:	sql.tab.o sql.o adlist.o format.o
+format:	sql.tab.o sql.o adlist.o format.o func.h
 	${CC} -o format format.o sql.tab.o sql.o adlist.o
 
 format.o:format.c
+
+format_str:	sql.tab.o sql.o adlist.o format_str.o
+	${CC} -o format_str format_str.o sql.tab.o sql.o adlist.o
+
+format_str.o: format_str.c
 
 index: sql.tab.o sql.o adlist.o index.o
 	${CC} -o index index.o sql.tab.o sql.o adlist.o

@@ -7,7 +7,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "func.h"
+
 /* TODO revert to hash table */
+
+char funcArray[FEND];
 
 char* tmp(int cmp) {
     if (cmp == 4)
@@ -40,12 +44,23 @@ char* tmp(int cmp) {
         return "NOT";
     else if (cmp == NULLX) 
         return "NULLX";
+    else if (cmp == ANDOP) 
+        return "AND";
+    else if (cmp == OR) 
+        return "OR";
+    else if (cmp == WHEN) 
+        return "WHEN";
+    else if (cmp == THEN) 
+        return "THEN";
     else
         assert(NULL);
 }
-extern Stmt *curStmt;
+extern Stmt *stmtArray[100];
+extern int indexArray;
 
 void stmt(Stmt *st, int indent);
+void print_list(list *l, int indent);
+void print_list2 (list *l, int indent);
 
 void zprintf(int indent, char *s, ...) {
     va_list ap;
@@ -129,8 +144,23 @@ void print_expr_item(Item *i, int indent) {
                 zprintf(0, ",");
                 print_expr_item(i->right, 0);
             }
+        } else if ((i ->token1 == FSUBSTRING) ||
+            (i->token1 == FTRIM) ||
+            (i->token1 == FIFNULL) ||
+            (i->token1 == FCONCAT)) {
+                zprintf(indent, FUNCNAME(i->token1)); 
+                zprintf(0,"("); 
+                if (i->right) {
+                    // i->right is list
+                    print_list(i->right, 0);
+                }
+                zprintf(0,")"); 
+
+                if (i->alias)
+                    zprintf(indent, " AS %s", i->alias);
         } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
-            zprintf(indent,"func("); 
+            zprintf(indent, FUNCNAME(i->token1)); 
+            zprintf(0,"("); 
             if (i->right) {
                 print_expr_item(i->right, 0);
             }
@@ -144,16 +174,83 @@ void print_expr_item(Item *i, int indent) {
             || (i->token1 == SUB_OP)
             || (i->token1 == DIV_OP)
             || (i->token1 == MUL_OP)
+            || (i->token1 == ANDOP)
+            || (i->token1 == OR)
         ) {
             print_expr_item(i->left, indent);
             if (i->token2)
                 printf(" %s ", tmp(i->token2));
             printf(" %s ", tmp(i->token1));
             print_expr_item(i->right, 0);
+        } else if ((i->token1 == COMPARISON)) {
+            print_expr_item(i->left, indent);
+            printf(" %s ", tmp(i->token2));
+            print_expr_item(i->right, 0);
+        } else if ((i->token1 == CASE)) {
+            zprintf(indent, "CASE ");
+            if (i->left) {
+                print_expr_item(i->left, 0);
+            } 
+            if (i->next) {
+                print_list2(i->next, 0);
+            }
+            if (i->right) {
+                printf( " ELSE ");
+                print_expr_item(i->right, 0);
+            }
+            printf(" END");
+            if (i->alias)
+                zprintf(0," AS %s", i->alias);
+
+        } else if ((i->token1 == ELSE)) {
+            printf(" %s ", tmp(i->token1));
+            print_expr_item(i, 0);
+        } else if ((i->token1 == WHEN)) {
+            printf("%s ", tmp(i->token1));
+            print_expr_item(i->left, 0);
+        } else if ((i->token1 == THEN)) {
+            printf(" %s ", tmp(i->token1));
+            print_expr_item(i->left, 0);
         } else {
+            printf("%d - %d", i->token1, i->token2); 
             assert(NULL); 
         }
     }
+}
+
+void print_list2 (list *l, int indent) {
+    if (!l) return;
+    if (listLength(l) == 0) return ;
+
+    listIter *iter = NULL;
+    listNode *node = NULL;
+    //printf("-----%d", listLength(l));
+    zprintf(indent, "");
+    iter = listGetIterator(l, AL_START_HEAD); 
+    while ((node = listNext(iter)) != NULL) {
+        Item *i = listNodeValue(node);
+        print_expr_item(i, 0);
+    }
+    listReleaseIterator(iter);
+}
+
+void print_list(list *l, int indent) {
+    if (!l) return;
+    if (listLength(l) == 0) return ;
+
+    listIter *iter = NULL;
+    listNode *node = NULL;
+    //printf("-----%d", listLength(l));
+    zprintf(indent, "");
+    iter = listGetIterator(l, AL_START_HEAD); 
+    while ((node = listNext(iter)) != NULL) {
+        Item *i = listNodeValue(node);
+        print_expr_item(i, 0);
+        if (listNextNode(node))
+            printf(", ");
+            
+    }
+    listReleaseIterator(iter);
 }
 
 void print_expr_stmt(Item *i, int indent) {
@@ -198,7 +295,13 @@ void print_expr_stmt(Item *i, int indent) {
             /* in ( select... ) */
             print_expr_item(i->left, indent);
             printf("\n");
-            zprintf(indent,"IN (\n ");
+            zprintf(indent,"IN (\n "); Stmt *ir = i->right; stmt(ir, indent + 1);
+            zprintf(indent,")");
+        } else if ((i->token1 == NOT) && (i->token2 == SELECT)) {
+            /* in ( select... ) */
+            print_expr_item(i->left, indent);
+            printf("\n");
+            zprintf(indent,"NOT IN (\n ");
             Stmt *ir = i->right;
             stmt(ir, indent + 1);
             zprintf(indent,")");
@@ -207,20 +310,59 @@ void print_expr_stmt(Item *i, int indent) {
             print_expr_item(i->left, indent);
             printf("\n");
             zprintf(indent,"IN (\n ");
-            Item *ir = i->right;
-            print_expr_item(ir, indent + 1);
+            list *ir = i->right;
+            // list 
+            print_list(ir, indent + 1);
             printf("\n");
             zprintf(indent,")");
-        } else if ((i->token1 == LIKE)
-            || (i->token1 == REGEXP)
-        ) {
+        } else if ((i->token1 == NOT) && (i->token2 == IN)) {
+            /* not in (1, 2, 3) */
+            print_expr_item(i->left, indent);
+            printf("\n");
+            zprintf(indent,"NOT IN (\n ");
+            list *ir = i->right;
+            // list 
+            print_list(ir, indent + 1);
+            printf("\n");
+            zprintf(indent,")");
+        } else if ((i->token1 == LIKE) || (i->token1 == REGEXP)) {
             print_expr_item(i->left, indent);
             if (i->token2)
                 printf(" %s ", tmp(i->token2));
             printf(" %s ", tmp(i->token1));
             print_expr_item(i->right, 0);
+        } else if ((i->token1 == NAME) && (i->token2 == 0)) {
+            /* 'where 1' stmt*/
+            zprintf(indent,"%s", i->name);
+        } else if ((i ->token1 == FSUBSTRING) ||
+            (i->token1 == FTRIM) ||
+            (i->token1 == FIFNULL) ||
+            (i->token1 == FCONCAT)) {
+                zprintf(indent, FUNCNAME(i->token1)); 
+                zprintf(0,"("); 
+                if (i->right) {
+                    // i->right is list
+                    print_list(i->right, 0);
+                }
+                zprintf(0,")"); 
+
+                if (i->alias)
+                    zprintf(indent, " AS %s", i->alias);
+        } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
+            zprintf(indent, FUNCNAME(i->token1)); 
+            zprintf(0,"("); 
+            if (i->right) {
+                print_expr_item(i->right, 0);
+            }
+            if (i->name)
+                zprintf(0,"%s", i->name); 
+            zprintf(0,")"); 
+
+            if (i->alias)
+                zprintf(indent, " AS %s", i->alias);
         } else {
-           assert(NULL); 
+            printf("%d - %d", i->token1, i->token2); 
+            assert(NULL); 
         }
     } 
 }    
@@ -502,19 +644,8 @@ void where(Stmt *stmt, int indent) {
 
         while ((node = listNext(iter)) != NULL) {
             Item *i = listNodeValue(node);
-            if ((i->token1 == COMPARISON)) {
-                //zprintf(indent,"\t");
                 print_expr_stmt(i, indent);
                 zprintf(indent,"\n");
-            } else if ((i->token1 == ANDOP) && (i->token2 == 0)) {
-                //zprintf(indent,"\t");
-                print_expr_stmt(i, indent);
-                zprintf(indent,"\n");
-            } else if ((i->token1 == OR) && (i->token2 == 0)) {
-                //zprintf(indent,"\t");
-                print_expr_stmt(i, indent);
-                zprintf(indent,"\n");
-            }
         }
         
         listReleaseIterator(iter);
@@ -544,10 +675,18 @@ void table(Stmt *st, int indent) {
                 zprintf(indent,"(\n");
                 stmt(t->sub, indent + 1);
                 zprintf(indent,") AS %s", t->alias);
-            } else if (t->alias)
-                zprintf(indent,"%s AS %s", t->name, t->alias);
-            else
-                zprintf(indent,"%s", t->name);
+            } else if (t->alias) {
+                if (t->db)
+                    zprintf(indent,"%s.%s AS %s", t->db, t->name, t->alias);
+                else
+                    zprintf(indent,"%s AS %s",t->name, t->alias);
+            }
+            else {
+                if (t->db)
+                    zprintf(indent,"%s.%s", t->db, t->name);
+                else
+                    zprintf(indent,"%s", t->name);
+            }
 
             if (listNextNode(node)) 
                 printf(",\n");
@@ -637,14 +776,29 @@ int main(int ac, char **av)
         exit(1);
     }
 
-    if(!yyparse()) {
-        printf("SQL parse worked\n");
-        printf("================\n");
-    } else
-        printf("SQL parse failed\n");
+    /* for big file */
+    yypush_buffer_state(yy_create_buffer( yyin, 1000000));
+    yyparse();
 
-    Stmt *st = curStmt;
-    stmt(st, 0);
+    convert();
+    int i = 0, j = 0;
+    for (i = 0; i < indexArray; i++) {
+        if (stmtArray[i] == NULL)
+            j++;
+    }
+    
+    printf("<<<<<<  This file has %d sql, success %d, failure %d >>>>>\n", indexArray, indexArray-j, j);
+
+    printf("\n-------------------------------------------------------------------------\n");
+    for (i = 0; i < indexArray; i++) {
+        Stmt *st = stmtArray[i];
+        if (st) {
+            stmt(st, 0); 
+            printf("-------------------------------------------------------------------------\n");
+        } else {
+            printf("SQL parse failed\n");
+        }
+    }
 
     return 0;
 } 

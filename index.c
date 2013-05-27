@@ -8,9 +8,9 @@
 #include <stdio.h>
 
 typedef struct Tab {
-    char *alias;
     char *name;
-    list *columns;
+    char *alias;
+    list *columns; // This table's columns
 } Tab;
 
 extern Stmt *curStmt;

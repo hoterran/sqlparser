@@ -26,9 +26,9 @@ ALL         { return ALL; }
 ALTER       { return ALTER; }
 ANALYZE     { return ANALYZE; }
 
-  /* Hack for BETWEEN ... AND ... 
-   * return special AND token if BETWEEN seen
-   */
+    /* Hack for BETWEEN ... AND ... 
+     * return special AND token if BETWEEN seen
+    */
 <BTWMODE>AND    { BEGIN INITIAL; return AND; }
 AND    { return ANDOP; }
 ANY     { return ANY; }
@@ -305,40 +305,275 @@ B'[01]+'     { yylval.strval = strdup(yytext); return STRING; }
 "<<"    { yylval.subtok = 1; return SHIFT; }
 ">>"    { yylval.subtok = 2; return SHIFT; }
 
-        /* functions */
+    /* functions */
 
-AVG/"("             { return FAVG; }
-SUBSTR(ING)?/"("    { return FSUBSTRING; }
-TRIM/"("            { return FTRIM; }
-DATE_ADD/"("        { return FDATE_ADD; }
-DATE_SUB/"("        { return FDATE_SUB; }
-ADDDATE/"("            { return FADDDATE; }
-BIT_AND/"("            { return FBIT_AND; }
-BIT_OR/"("            { return FBIT_OR; }
-BIT_XOR/"("            { return FBIT_XOR; }
-CAST/"("            { return FBIT_CAST; }
-COUNT/"("            { return FCOUNT; }
-CURDATE/"("            { return FCURDATE; }
-CURTIME/"("            { return FCURTIME; }
-EXTRACT/"("            { return FEXTRACT; }
-GROUP_CONCAT/"("    { return FGROUP_CONCAT; }
-MAX/"("                { return FMAX; }
-MID/"("                { return FMID; }
-MIN/"("                { return FMIN; }
-NOW/"("                { return FNOW; }
-POSITION/"("        { return FPOSITION; }
-SESSION_USER/"("    { return FSESSION_USER; }
-STD/"("                { return FSTD; }
-STDDEV/"("            { return FSTDDEV; }
-STDDEV_POP/"("        { return FSTDDEV_POP; }
-STDDEV_SAMP/"("        { return FSTDDEV_SAMP; }
-SUBDATE/"("            { return FSUBDATE; }
-SUM/"("                { return FSUM; }
-SYSDATE/"("            { return FSYSDATE; }
-SYSTEM_USER/"("        { return FSYSTEM_USER; }
-VARIANCE/"("        { return FVARIANCE; }
-VAR_POP/"("            { return FVAR_POP; }
-VAR_SAMP/"("        { return FVAR_SAMP; }
+ABS/"(" {return FABS; }
+ACOS/"(" {return FACOS; }
+ADDTIME/"(" {return FADDTIME; }
+AES_DECRYPT/"(" {return FAES_DECRYPT; }
+AES_ENCRYPT/"(" {return FAES_ENCRYPT; }
+AREA/"(" {return FAREA; }
+ASBINARY/"(" {return FASBINARY; }
+ASIN/"(" {return FASIN; }
+ASTEXT/"(" {return FASTEXT; }
+ASWKB/"(" {return FASWKB; }
+ASWKT/"(" {return FASWKT; }
+ATAN/"(" {return FATAN; }
+ATAN2/"(" {return FATAN2; }
+ASCII/"(" {return FASCII; }
+AVG/"(" {return FAVG; }
+ADDDATE/"(" {return FADDDATE; }
+BENCHMARK/"(" {return FBENCHMARK; }
+BIN/"(" {return FBIN; }
+BIT_AND/"(" {return FBIT_AND; }
+BIT_OR/"(" {return FBIT_OR; }
+BIT_XOR/"(" {return FBIT_XOR; }
+BIT_COUNT/"(" {return FBIT_COUNT; }
+BIT_LENGTH/"(" {return FBIT_LENGTH; }
+CAST/"(" {return FCAST; }
+CEIL(ING)?/"(" {return FCEILING; }
+CENTROID/"(" {return FCENTROID; }
+CHAR/"(" {return FCHAR; }
+CHAR(ACTER)?_LENGTH/"(" {return FCHARACTER_LENGTH; }
+COERCIBILITY/"(" {return FCOERCIBILITY; }
+COMPRESS/"(" {return FCOMPRESS; }
+CONCAT/"(" {return FCONCAT; }
+CONCAT_WS/"(" {return FCONCAT_WS; }
+CONNECTION_ID/"(" {return FCONNECTION_ID; }
+CONV/"(" {return FCONV; }
+CONVERT_TZ/"(" {return FCONVERT_TZ; }
+COS/"(" {return FCOS; }
+COT/"(" {return FCOT; }
+CRC32/"(" {return FCRC32; }
+CROSSESS/"(" {return FCROSSESS; }
+COUNT/"(" {return FCOUNT; }
+CHARSET/"(" {return FCHARSET; }
+COLLATION/"(" {return FCOLLATION; }
+CURRENT_USER/"(" {return FCURRENT_USER; }
+CURDATE/"(" {return FCURDATE; }
+CURRENT_DATE/"(" {return FCURRENT_DATE; }
+CURTIME/"(" {return FCURTIME; }
+CURTIME_TIME/"(" {return FCURTIME_TIME; }
+CURTIME_TIMESTAMP/"(" {return FCURTIME_TIMESTAMP; }
+DATE/"(" {return FDATE; }
+DATEDIFF/"(" {return FDATEDIFF; }
+DATENAME/"(" {return FDATENAME; }
+DATEOFMONTH/"(" {return FDATEOFMONTH; }
+DATEOFWEEK/"(" {return FDATEOFWEEK; }
+DATEOFYEAR/"(" {return FDATEOFYEAR; }
+DATE_ADD/"(" {return FDATE_ADD; }
+DATE_SUB/"(" {return FDATE_SUB; }
+DATE_FORMAT/"(" {return FDATE_FORMAT; }
+DATABASE/"(" {return FDATABASE; }
+DEFAULT/"(" {return FDEFAULT; }
+DECODE/"(" {return FDECODE; }
+DEGREES/"(" {return FDEGREES; }
+DES_DECRYPT/"(" {return FDES_DECRYPT; }
+DES_ENCRYPT/"(" {return FDES_ENCRYPT; }
+DIMENSION/"(" {return FDIMENSION; }
+ISJOINT/"(" {return FISJOINT; }
+ELT/"(" {return FELT; }
+ENCODE/"(" {return FENCODE; }
+ENCRYPT/"(" {return FENCRYPT; }
+ENDPOINT/"(" {return FENDPOINT; }
+ENVELOPE/"(" {return FENVELOPE; }
+EQUALS/"(" {return FEQUALS; }
+EXP/"(" {return FEXP; }
+EXPORT_SET/"(" {return FEXPORT_SET; }
+EXTRACT/"(" {return FEXTRACT; }
+EXTERIORRING/"(" {return FEXTERIORRING; }
+EXTRACTVALUE/"(" {return FEXTRACTVALUE; }
+FIELD/"(" {return FFIELD; }
+FIND_IN_SET/"(" {return FFIND_IN_SET; }
+FLOOR/"(" {return FFLOOR; }
+FORMAT/"(" {return FFORMAT; }
+FOUND_ROWS/"(" {return FFOUND_ROWS; }
+FROM_DAYS/"(" {return FFROM_DAYS; }
+FROM_UNIXTIME/"(" {return FFROM_UNIXTIME; }
+GET_FORMAT/"(" {return FGET_FORMAT; }
+GEOMCOLLFROMTEXT/"(" {return FGEOMCOLLFROMTEXT; }
+GEOMCOLLFROMWKB/"(" {return FGEOMCOLLFROMWKB; }
+GEOMETRYCOLLECTIONFROMTEXT/"(" {return FGEOMETRYCOLLECTIONFROMTEXT; }
+GEOMETRYCOLLECTIONFROMWKB/"(" {return FGEOMETRYCOLLECTIONFROMWKB; }
+GEOMETRYFROMTEXT/"(" {return FGEOMETRYFROMTEXT; }
+GEOMETRYFROMWKB/"(" {return FGEOMETRYFROMWKB; }
+GEOMETRYN/"(" {return FGEOMETRYN; }
+GEOMETRYTYPE/"(" {return FGEOMETRYTYPE; }
+GEOMFROMTEXT/"(" {return FGEOMFROMTEXT; }
+GEOMFROMWKB/"(" {return FGEOMFROMWKB; }
+GET_LOCK/"(" {return FGET_LOCK; }
+GLENGTH/"(" {return FGLENGTH; }
+GREATEST/"(" {return FGREATEST; }
+HEX/"(" {return FHEX; }
+HOUR/"(" {return FHOUR; }
+INSERT/"(" {return FINSERT; }
+INSTR/"(" {return FINSTR; }
+IFNULL/"(" {return FIFNULL; }
+INET_ATON/"(" {return FINET_ATON; }
+INET_NTOA/"(" {return FINET_NTOA; }
+INTERIORRINGN/"(" {return FINTERIORRINGN; }
+INTERSECTS/"(" {return FINTERSECTS; }
+ISCLOSED/"(" {return FISCLOSED; }
+ISEMPTY/"(" {return FISEMPTY; }
+ISNULL/"(" {return FISNULL; }
+ISSIMPLE/"(" {return FISSIMPLE; }
+IS_FREE_LOCK/"(" {return FIS_FREE_LOCK; }
+IS_USED_LOCK/"(" {return FIS_USED_LOCK; }
+LAST_DAY/"(" {return FLAST_DAY; }
+LAST_INSERT_ID/"(" {return FLAST_INSERT_ID; }
+LCASE/"(" {return FLCASE; }
+LEFT/"(" {return FLEFT; }
+LENGTH/"(" {return FLENGTH; }
+LINEFROMTEXT/"(" {return FLINEFROMTEXT; }
+LINEFROMWKB/"(" {return FLINEFROMWKB; }
+LINESTRINGFROMTEXT/"(" {return FLINESTRINGFROMTEXT; }
+LINESTRINGFROMWKB/"(" {return FLINESTRINGFROMWKB; }
+LN/"(" {return FLN; }
+LOAD_FILE/"(" {return FLOAD_FILE; }
+LOCATE/"(" {return FLOCATE; }
+LOG/"(" {return FLOG; }
+LOG10/"(" {return FLOG10; }
+LOG2/"(" {return FLOG2; }
+LOWER/"(" {return FLOWER; }
+LPAD/"(" {return FLPAD; }
+LTRIM/"(" {return FLTRIM; }
+LOCALTIME/"(" {return FLOCALTIME; }
+LOCALTIMESTAMP/"(" {return FLOCALTIMESTAMP; }
+MAKEDATE/"(" {return FMAKEDATE; }
+MAKETIME/"(" {return FMAKETIME; }
+MAKE_SET/"(" {return FMAKE_SET; }
+MASTER_POS_WAIT/"(" {return FMASTER_POS_WAIT; }
+MBRCONTAINS/"(" {return FMBRCONTAINS; }
+MBRDISJOINT/"(" {return FMBRDISJOINT; }
+MBREQUAL/"(" {return FMBREQUAL; }
+MBRINTERSECTS/"(" {return FMBRINTERSECTS; }
+MBROVERLAPS/"(" {return FMBROVERLAPS; }
+MBRTOUCHES/"(" {return FMBRTOUCHES; }
+MBRWITHIN/"(" {return FMBRWITHIN; }
+MD5/"(" {return FMD5; }
+MLINEFROMTEXT/"(" {return FMLINEFROMTEXT; }
+MLINEFROMWKB/"(" {return FMLINEFROMWKB; }
+MONTHNAME/"(" {return FMONTHNAME; }
+MPOINTFROMTEXT/"(" {return FMPOINTFROMTEXT; }
+MPOINTFROMWKB/"(" {return FMPOINTFROMWKB; }
+MPOLYFROMTEXT/"(" {return FMPOLYFROMTEXT; }
+MPOLYFROMWKB/"(" {return FMPOLYFROMWKB; }
+MULTILINESTRINGFROMTEXT/"(" {return FMULTILINESTRINGFROMTEXT; }
+MULTILINESTRINGFROMWKB/"(" {return FMULTILINESTRINGFROMWKB; }
+MULTIPOINTFROMTEXT/"(" {return FMULTIPOINTFROMTEXT; }
+MULTIPOINTFROMWKB/"(" {return FMULTIPOINTFROMWKB; }
+MULTIPOLYGONFROMTEXT/"(" {return FMULTIPOLYGONFROMTEXT; }
+MULTIPOLYGONFROMWKB/"(" {return FMULTIPOLYGONFROMWKB; }
+MICROSECOND/"(" {return FMICROSECOND; }
+MINUTE/"(" {return FMINUTE; }
+MONTH/"(" {return FMONTH; }
+GROUP_CONCAT/"(" {return FGROUP_CONCAT; }
+MAX/"(" {return FMAX; }
+MID/"(" {return FMID; }
+MIN/"(" {return FMIN; }
+MOD/"(" {return FMOD; }
+NOW/"(" {return FNOW; }
+NAME_CONST/"(" {return FNAME_CONST; }
+NULLIF/"(" {return FNULLIF; }
+NUMGEOMETRIES/"(" {return FNUMGEOMETRIES; }
+NUMINTERIORRINGS/"(" {return FNUMINTERIORRINGS; }
+NUMPOINTS/"(" {return FNUMPOINTS; }
+OCT/"(" {return FOCT; }
+OCTET_LENGTH/"(" {return FOCTET_LENGTH; }
+ORD/"(" {return FORD; }
+OVERLAPS/"(" {return FOVERLAPS; }
+OLD_PASSWORD/"(" {return FOLD_PASSWORD; }
+PERIOD_ADD/"(" {return FPERIOD_ADD; }
+PERIOD_DIFF/"(" {return FPERIOD_DIFF; }
+PI/"(" {return FPI; }
+POSITION/"(" {return FPOSITION; }
+PASSWORD/"(" {return FPASSWORD; }
+POINTFROMTEXT/"(" {return FPOINTFROMTEXT; }
+POINTFROMWKB/"(" {return FPOINTFROMWKB; }
+POINTN/"(" {return FPOINTN; }
+POLYFROMTEXT/"(" {return FPOLYFROMTEXT; }
+POLYFROMWKB/"(" {return FPOLYFROMWKB; }
+POLYGONFROMTEXT/"(" {return FPOLYGONFROMTEXT; }
+POLYGONFROMWKB/"(" {return FPOLYGONFROMWKB; }
+POW/"(" {return FPOW; }
+POWER/"(" {return FPOWER; }
+QUARTER/"(" {return FQUARTER; }
+QUOTE/"(" {return FQUOTE; }
+RADIANS/"(" {return FRADIANS; }
+RAND/"(" {return FRAND; }
+ROUND/"(" {return FROUND; }
+ROW_COUNT/"(" {return FROW_COUNT; }
+REPEAT/"(" {return FREPEAT; }
+REPLACE/"(" {return FREPLACE; }
+REVERSE/"(" {return FREVERSE; }
+RIGHT/"(" {return FRIGHT; }
+RPAD/"(" {return FRPAD; }
+RTRIM/"(" {return FRTRIM; }
+RELEASE_LOCK/"(" {return FRELEASE_LOCK; }
+SEC_TO_TIME/"(" {return FSEC_TO_TIME; }
+SEC_TO_DATE/"(" {return FSEC_TO_DATE; }
+SHA/"(" {return FSHA; }
+SHA1/"(" {return FSHA1; }
+SIGN/"(" {return FSIGN; }
+SIN/"(" {return FSIN; }
+SLEEP/"(" {return FSLEEP; }
+SCHEMA/"(" {return FSCHEMA; }
+SOUNDEX/"(" {return FSOUNDEX; }
+SPACE/"(" {return FSPACE; }
+SQRT/"(" {return FSQRT; }
+SRID/"(" {return FSRID; }
+STARTPOINT/"(" {return FSTARTPOINT; }
+STRCMP/"(" {return FSTRCMP; }
+STR_TO_DATE/"(" {return FSTR_TO_DATE; }
+SECOND/"(" {return FSECOND; }
+SUBTIME/"(" {return FSUBTIME; }
+SUBSTR(ING)?/"(" {return FSUBSTRING; }
+SUBSTRING_INDEX/"(" {return FSUBSTRING_INDEX; }
+SESSION_USER/"(" {return FSESSION_USER; }
+STD/"(" {return FSTD; }
+STDDEV/"(" {return FSTDDEV; }
+STDDEV_POP/"(" {return FSTDDEV_POP; }
+STDDEV_SAMP/"(" {return FSTDDEV_SAMP; }
+SUBDATE/"(" {return FSUBDATE; }
+SUM/"(" {return FSUM; }
+SYSDATE/"(" {return FSYSDATE; }
+SYSTEM_USER/"(" {return FSYSTEM_USER; }
+TAN/"(" {return FTAN; }
+TIMEDIFF/"(" {return FTIMEDIFF; }
+TIME_FORMAT/"(" {return FTIME_FORMAT; }
+TIME_TO_SEC/"(" {return FTIME_TO_SEC; }
+TRUNCATE/"(" {return FTRUNCATE; }
+TOUCHES/"(" {return FTOUCHES; }
+TO_DAYS/"(" {return FTO_DAYS; }
+TRIM/"(" {return FTRIM; }
+TIME/"(" {return FTIME; }
+TIMESTAMP/"(" {return FTIMESTAMP; }
+TIMESTAMPADD/"(" {return FTIMESTAMPADD; }
+TIMESTAMPDIFF/"(" {return FTIMESTAMPDIFF; }
+VARIANCE/"(" {return FVARIANCE; }
+VAR_POP/"(" {return FVAR_POP; }
+VAR_SAMP/"(" {return FVAR_SAMP; }
+UCASE/"(" {return FUCASE; }
+UNCOMPRESS/"(" {return FUNCOMPRESS; }
+UNCOMPRESSED_LENGTH/"(" {return FUNCOMPRESSED_LENGTH; }
+UNHEX/"(" {return FUNHEX; }
+USER/"(" {return FUSER; }
+UNIX_TIMESTAMP/"(" {return FUNIX_TIMESTAMP; }
+UPDATEXML/"(" {return FUPDATEXML; }
+UPPER/"(" {return FUPPER; }
+UUID/"(" {return FUUID; }
+UUID_SHORT/"(" {return FUUID_SHORT; }
+VERSION/"(" {return FVERSION; }
+UTC_DATE/"(" {return FUTC_DATE; }
+UTC_TIME/"(" {return FUTC_TIME; }
+UTC_TIMESTAMP/"(" {return FUTC_TIMESTAMP; }
+WEEK/"(" {return FWEEK; }
+WEEKDAY/"(" {return FWEEKDAY; }
+WEEKOFYEAR/"(" {return FWEEKOFYEAR; }
+YEAR/"(" {return FYEAR; }
+YEARWEEK/"(" {return FYEARWEEK; }
+X/"(" {return FX; }
+Y/"(" {return FY; }
 
     /* 
      * peek ahead and return function if name(
@@ -355,7 +590,8 @@ SUM[ ]+    { int c = input(); unput(c);
            yylval.strval = strdup(yytext);
            return NAME; }
     */
-[A-Za-z][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
+
+[A-Za-z\?][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
                           return NAME; }
 `[^`/\\.\n]+`           { yylval.strval = strdup(yytext+1);
                           yylval.strval[yyleng-2] = 0;

@@ -7,10 +7,21 @@
 #include <string.h>
 #include <stdio.h>
 
-Stmt *curStmt;
+Stmt *stmtArray[2000];
+int indexArray = 0;
+Stmt *curStmt = NULL;
 
 void yyerror(char *s, ...);
 void debug(char *s, ...);
+
+/* for simple function */
+#define NORMAL_FUNCTION(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->right = (yyvsp[(3) - (4)].item);\
+        i->token1 = f;\
+        (yyval.item) = i;}\
+        while(0)
 
 //extern int yydebug = 1;
 
@@ -21,7 +32,7 @@ void debug(char *s, ...);
     double floatval;
     char *strval;
     int subtok;
-    list* list;
+    list* listval;
     Item* item;
     Table* tableval;
     Stmt *stmt;
@@ -29,6 +40,7 @@ void debug(char *s, ...);
     
     /* names and literal values */
 
+%token <listval> LIST
 %token <strval> NAME
 %token <strval> STRING
 %token <intval> INTNUM
@@ -57,6 +69,7 @@ void debug(char *s, ...);
 %left '^'
 %nonassoc UMINUS
 
+    /* TODO sql/lex.h */
 %token ADD
 %token ALL
 %token ALTER
@@ -279,26 +292,300 @@ void debug(char *s, ...);
 %token ZEROFILL
 
  /* functions with special syntax */
+
+ /* sql/item_create.cc func_array */ 
+
 %token FSTART
 
-%token FSUBSTRING
-%token FTRIM
-%token FDATE_ADD FDATE_SUB
-%token FCOUNT FSUM FAVG
-%token FADDDATE FSUBDATE
-%token FBIT_AND FBIT_OR FBIT_XOR FBIT_CAST 
-%token FCURDATE FCURTIME
-%token FEXTRACT
+%token FABS
+%token FACOS
+%token FADDTIME
+%token FAES_DECRYPT
+%token FAES_ENCRYPT
+%token FAREA
+%token FASBINARY
+%token FASIN
+%token FASTEXT
+%token FASWKB
+%token FASWKT
+%token FATAN
+%token FATAN2
+%token FASCII
+%token FAVG
+%token FADDDATE
+
+%token FBENCHMARK
+%token FBIN
+%token FBIT_AND
+%token FBIT_OR
+%token FBIT_XOR
+%token FBIT_COUNT
+%token FBIT_LENGTH
+
+%token FCAST
+%token FCEILING
+%token FCENTROID
+%token FCHAR
+%token FCHARACTER_LENGTH
+%token FCOERCIBILITY
+%token FCOMPRESS
+%token FCONCAT
+%token FCONCAT_WS
+%token FCONNECTION_ID
+%token FCONV
+%token FCONVERT_TZ
+%token FCOS
+%token FCOT
+%token FCRC32
+%token FCROSSESS
+%token FCOUNT
+%token FCHARSET
+%token FCOLLATION
+%token FCURRENT_USER
+%token FCURDATE
+%token FCURRENT_DATE
+%token FCURTIME
+%token FCURTIME_TIME
+%token FCURTIME_TIMESTAMP
+
+%token FDATE
+%token FDATEDIFF
+%token FDATENAME
+%token FDATEOFMONTH
+%token FDATEOFWEEK
+%token FDATEOFYEAR
+%token FDATE_ADD
+%token FDATE_SUB
+%token FDATE_FORMAT
+%token FDATABASE
+%token FDEFAULT
+%token FDECODE
+%token FDEGREES
+%token FDES_DECRYPT
+%token FDES_ENCRYPT
+%token FDIMENSION
+%token FISJOINT
+
+%token FELT
+%token FENCODE
+%token FENCRYPT
+%token FENDPOINT
+%token FENVELOPE
+%token FEQUALS
+%token FEXP
+%token FEXPORT_SET
+%token FEXTRACT;
+%token FEXTERIORRING
+%token FEXTRACTVALUE
+
+%token FFIELD
+%token FFIND_IN_SET
+%token FFLOOR
+%token FFORMAT
+%token FFOUND_ROWS
+%token FFROM_DAYS
+%token FFROM_UNIXTIME
+
+%token FGET_FORMAT
+%token FGEOMCOLLFROMTEXT
+%token FGEOMCOLLFROMWKB
+%token FGEOMETRYCOLLECTIONFROMTEXT
+%token FGEOMETRYCOLLECTIONFROMWKB
+%token FGEOMETRYFROMTEXT
+%token FGEOMETRYFROMWKB
+%token FGEOMETRYN
+%token FGEOMETRYTYPE
+%token FGEOMFROMTEXT
+%token FGEOMFROMWKB
+%token FGET_LOCK
+%token FGLENGTH
+%token FGREATEST
+
+%token FHEX
+%token FHOUR
+
+%token FINSERT
+%token FINSTR
+%token FIFNULL
+%token FINET_ATON
+%token FINET_NTOA
+%token FINTERIORRINGN
+%token FINTERSECTS
+%token FISCLOSED
+%token FISEMPTY
+%token FISNULL
+%token FISSIMPLE
+%token FIS_FREE_LOCK
+%token FIS_USED_LOCK
+
+%token FLAST_DAY
+%token FLAST_INSERT_ID
+%token FLCASE
+%token FLEFT
+%token FLENGTH
+%token FLINEFROMTEXT
+%token FLINEFROMWKB
+%token FLINESTRINGFROMTEXT
+%token FLINESTRINGFROMWKB
+%token FLN
+%token FLOAD_FILE
+%token FLOCATE
+%token FLOG
+%token FLOG10
+%token FLOG2
+%token FLOWER
+%token FLPAD
+%token FLTRIM
+%token FLOCALTIME
+%token FLOCALTIMESTAMP
+
+%token FMAKEDATE
+%token FMAKETIME
+%token FMAKE_SET
+%token FMASTER_POS_WAIT
+%token FMBRCONTAINS
+%token FMBRDISJOINT
+%token FMBREQUAL
+%token FMBRINTERSECTS
+%token FMBROVERLAPS
+%token FMBRTOUCHES
+%token FMBRWITHIN
+%token FMD5
+%token FMLINEFROMTEXT
+%token FMLINEFROMWKB
+%token FMONTHNAME
+%token FMPOINTFROMTEXT
+%token FMPOINTFROMWKB
+%token FMPOLYFROMTEXT
+%token FMPOLYFROMWKB
+%token FMULTILINESTRINGFROMTEXT
+%token FMULTILINESTRINGFROMWKB
+%token FMULTIPOINTFROMTEXT
+%token FMULTIPOINTFROMWKB
+%token FMULTIPOLYGONFROMTEXT
+%token FMULTIPOLYGONFROMWKB
+
+%token FMICROSECOND
+%token FMINUTE
+%token FMONTH
+
 %token FGROUP_CONCAT
-%token FMAX FMID FMIN FNOW
+%token FMAX
+%token FMID
+%token FMIN
+%token FMOD
+
+%token FNOW
+%token FNAME_CONST
+%token FNULLIF
+%token FNUMGEOMETRIES
+%token FNUMINTERIORRINGS
+%token FNUMPOINTS
+
+%token FOCT
+%token FOCTET_LENGTH
+%token FORD
+%token FOVERLAPS
+%token FOLD_PASSWORD
+
+%token FPERIOD_ADD
+%token FPERIOD_DIFF
+%token FPI
 %token FPOSITION
+%token FPASSWORD
+%token FPOINTFROMTEXT
+%token FPOINTFROMWKB
+%token FPOINTN
+%token FPOLYFROMTEXT
+%token FPOLYFROMWKB
+%token FPOLYGONFROMTEXT
+%token FPOLYGONFROMWKB
+%token FPOW
+%token FPOWER
+
+%token FQUARTER
+%token FQUOTE
+
+%token FRADIANS
+%token FRAND
+%token FROUND
+%token FROW_COUNT
+%token FREPEAT
+%token FREPLACE
+%token FREVERSE
+%token FRIGHT
+%token FRPAD
+%token FRTRIM
+%token FRELEASE_LOCK
+
+%token FSEC_TO_TIME
+%token FSEC_TO_DATE
+%token FSHA
+%token FSHA1
+%token FSLEEP
+%token FSCHEMA
+%token FSOUNDEX
+%token FSPACE
+%token FSQRT
+%token FSRID
+%token FSTARTPOINT
+%token FSTRCMP
+%token FSTR_TO_DATE
+%token FSECOND
+%token FSUBTIME
+%token FSIGN
+%token FSIN
+%token FSUBSTRING
+%token FSUBSTRING_INDEX
 %token FSESSION_USER
-%token FSTD FSTDDEV FSTDDEV_POP FSTDDEV_SAMP
+%token FSTD
+%token FSTDDEV
+%token FSTDDEV_POP
+%token FSTDDEV_SAMP
+%token FSUBDATE
+%token FSUM
 %token FSYSDATE
 %token FSYSTEM_USER
+
+%token FTAN
+%token FTIMEDIFF
+%token FTIME_FORMAT
+%token FTIME_TO_SEC
+%token FTRUNCATE
+%token FTOUCHES
+%token FTO_DAYS
+%token FTRIM
+%token FTIME
+%token FTIMESTAMP
+%token FTIMESTAMPADD
+%token FTIMESTAMPDIFF
+
 %token FVARIANCE
 %token FVAR_POP
 %token FVAR_SAMP
+
+%token FUCASE
+%token FUNCOMPRESS
+%token FUNCOMPRESSED_LENGTH
+%token FUNHEX
+%token FUSER
+%token FUNIX_TIMESTAMP
+%token FUPDATEXML
+%token FUPPER
+%token FUUID
+%token FUUID_SHORT
+%token FVERSION
+%token FUTC_DATE
+%token FUTC_TIME
+%token FUTC_TIMESTAMP
+%token FWEEK
+%token FWEEKDAY
+%token FWEEKOFYEAR
+%token FYEAR
+%token FYEARWEEK
+
+%token FX
+%token FY
 
 %token FEND
 
@@ -307,9 +594,9 @@ void debug(char *s, ...);
 
 %type <stmt> select_stmt
 %type <stmt> table_subquery
-%type <item> expr select_expr val_list opt_val_list
+%type <listval> val_list opt_val_list case_list
+%type <item> expr select_expr 
 %type <intval> select_opts select_expr_list 
-%type <intval> case_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
 %type <intval> left_or_right opt_left_or_right_outer column_list
@@ -328,8 +615,21 @@ void debug(char *s, ...);
 
 /* must ; end */
 
-stmt_list: stmt ';'
-    | stmt_list stmt ';'
+stmt_list: error  {
+    /* TODO  free curStmt */
+    curStmt = NULL;
+    }
+    | stmt ';' {
+        stmtArray[indexArray] = curStmt;
+        indexArray++;
+        curStmt = NULL;
+    }
+    | stmt_list stmt ';' {
+        stmtArray[indexArray] = curStmt;
+        indexArray++;
+        curStmt = NULL;
+    }
+
     ;
 
    /* SELECT */
@@ -529,10 +829,22 @@ table_factor:
 
         listAddNodeTail(curStmt->joinList, t);
     }
-    /* below exists ?*/
+
     | NAME '.' NAME opt_as_alias index_hint { 
         debug("TABLE %s.%s", $1, $3);
-        free($1); free($3); }
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($1);
+        t->name = strdup($3);
+        free($1);
+        free($3);
+
+        if ($4) {
+            t->alias = strdup($4);
+            free($4);
+        }
+
+        listAddNodeTail(curStmt->joinList, t);
+    }
     | table_subquery opt_as NAME {
         debug("SUBQUERYAS %s", $3);
         Table *t = calloc(1, sizeof(*t)); 
@@ -1261,15 +1573,15 @@ expr: expr '+' expr { debug("ADD");
         $$ = i;
     }
    | expr COMPARISON '(' select_stmt ')' { debug("CMPSELECT %d", $2); 
-        /* TODO */
         Item *i = calloc(1, sizeof(*i));
         i->token1 = COMPARISON;
         i->token2 = $2;
         i->left = $1;
-        i->next = NULL;
+        i->next = $4;
         $$ = i;
    }
    | expr COMPARISON ANY '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
+   /* TODO */
    | expr COMPARISON SOME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    | expr COMPARISON ALL '(' select_stmt ')' { debug("CMPALLSELECT %d", $2); }
    | expr '|' expr { debug("BITOR"); 
@@ -1372,32 +1684,19 @@ expr: expr BETWEEN expr AND expr %prec BETWEEN { debug("BETWEEN");
     }
     ;
 
-    /* func(a, b, c)
-
-        from c -> b ->a -> func
-
-        item(c)
-            right = NULL;
-            left = b
-        item(b)
-            right = c
-            left =  a
-        item(a)
-            right = b
-            left = func
-        item(func)
-            right = a
-            left = NULL
+    /* (a, b, c)
+        list(a, b,c)
     */    
 val_list: expr {
-        debug("val_list:expr1 %p %s", $1, $1->name);
-        $$ = $1; 
+        debug("val_list:expr1 %p %s %d %s", $1, $1->name, $1->token1);
+        list *val_list = listCreate();
+        listAddNodeHead(val_list, $1);
+        $$ = val_list;
     }
     | expr ',' val_list {
-        debug("val_list:expr2 %p %s, %p %s", $3, $3->name, $1, $1->name); 
-        $3->left = $1;
-        $1->right = $3;
-        $$ = $1;
+        debug("val_list:expr2 %p %s", $1, $1->name); 
+        listAddNodeHead($3, $1);
+        $$ = $3;
     }
     ;
 
@@ -1464,89 +1763,286 @@ expr: NAME '(' opt_val_list ')' {
     ;
 
   /* functions with special syntax */
-expr: FCOUNT '(' '*' ')'    { 
-        debug("COUNTALL");
-        Item *i = calloc(1, sizeof(*i));
-        i->name = "*";
-        i->token1 = FCOUNT;
-        $$ = i;
-    }
-    | FCOUNT '(' expr ')'    { 
-        debug(" CALL COUNT");
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FCOUNT;
-        $$ = i;
-    }
-    | FSUM '(' '*' ')'        {
-        debug("SUMALL");
-        Item *i = calloc(1, sizeof(*i));
-        i->name = "*";
-        i->token1 = FSUM;
-        $$ = i;
-    }
-    | FSUM '(' expr ')'        { 
-        debug("CALL SUM");
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FSUM;
-        $$ = i;
-    }
-    | FAVG '(' '*' ')'        {
-        debug ("AVGALL");
-        Item *i = calloc(1, sizeof(*i));
-        i->name = "*";
-        i->token1 = FAVG;
-        $$ = i;
-    }
-    | FAVG '(' expr ')'        {
-        debug ("CALL AVG"); 
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FAVG;
-        $$ = i;
-    }
-    | FADDDATE '(' expr ')'            { debug ("ADDDATE") }
-    | FSUBDATE '(' expr ')'            { debug ("SUBDATE") }
-    | FBIT_AND '(' expr ')'            { debug ("BIT") }
-    | FBIT_OR '(' expr ')'            { debug ("BIT") }
-    | FBIT_XOR FBIT_CAST    '(' expr ')'    { debug ("BIT") }
-    | FCURDATE '(' ')'            { 
-        debug ("CURDATE");
-        Item *i = calloc(1, sizeof(*i));
-        i->token1 = FCURDATE;
-        $$ = i;
-    }
-    | FCURTIME '(' ')'            {
-        debug ("CURTIME");
-        Item *i = calloc(1, sizeof(*i));
-        i->token1 = FCURDATE;
-        $$ = i;
-    }
-    | FEXTRACT '(' expr ')'            { debug ("EXTRACT") }
-    | FGROUP_CONCAT    '(' expr ')'    { debug ("GROUP_CONCAT") }
-    | FMAX '(' expr ')'                { debug ("MAX") }
-    | FMID '(' expr ')'                { debug ("MID") }
-    | FMIN '(' expr ')'                { debug ("MIN") }
-    | FNOW '(' expr ')'                { debug ("NOW") }
-    | FPOSITION '(' expr ')'            { debug ("POSITION") }
-    | FSESSION_USER '(' expr ')'        { debug ("SESSION_USER") }
-    | FSTD '(' expr ')'                { debug ("STD") }
-    | FSTDDEV '(' expr ')'            { debug ("STDDEV") }
-    | FSTDDEV_POP '(' expr ')'        { debug ("STDDEV_POP") }
-    | FSTDDEV_SAMP '(' expr ')'        { debug ("STDDEV_SAMP") }
-    | FSYSDATE '(' expr ')'            { debug ("SYSDATE") }
-    | FSYSTEM_USER '(' expr ')'        { debug ("SYSTEM_USER") }
-    | FVARIANCE '(' expr ')'            { debug ("VARIANCE") }
-    | FVAR_POP '(' expr ')'            { debug ("VAR_POP") }
-    | FVAR_SAMP '(' expr ')'            { debug ("VAR_SAMP") }
-    ;
+
+expr: FABS '(' expr ')' { NORMAL_FUNCTION(FABS); }
+    | FACOS '(' expr ')' { NORMAL_FUNCTION(FACOS); }
+    | FADDTIME '(' expr ')' { NORMAL_FUNCTION(FADDTIME); }
+    | FAES_DECRYPT '(' expr ')' { NORMAL_FUNCTION(FAES_DECRYPT); }
+    | FAES_ENCRYPT '(' expr ')' { NORMAL_FUNCTION(FAES_ENCRYPT); }
+    | FAREA '(' expr ')' { NORMAL_FUNCTION(FAREA); }
+    | FASBINARY '(' expr ')' { NORMAL_FUNCTION(FASBINARY); }
+    | FASIN '(' expr ')' { NORMAL_FUNCTION(FASIN); }
+    | FASTEXT '(' expr ')' { NORMAL_FUNCTION(FASTEXT); }
+    | FASWKB '(' expr ')' { NORMAL_FUNCTION(FASWKB); }
+    | FASWKT '(' expr ')' { NORMAL_FUNCTION(FASWKT); }
+    | FATAN '(' expr ')' { NORMAL_FUNCTION(FATAN); }
+    | FATAN2 '(' expr ')' { NORMAL_FUNCTION(FATAN2); }
+    | FASCII '(' expr ')' { NORMAL_FUNCTION(FASCII); }
+    | FAVG '(' expr ')' { NORMAL_FUNCTION(FAVG); }
+    | FADDDATE '(' expr ')' { NORMAL_FUNCTION(FADDDATE); }
+    | FBENCHMARK '(' expr ')' { NORMAL_FUNCTION(FBENCHMARK); }
+    | FBIN '(' expr ')' { NORMAL_FUNCTION(FBIN); }
+    | FBIT_AND '(' expr ')' { NORMAL_FUNCTION(FBIT_AND); }
+    | FBIT_OR '(' expr ')' { NORMAL_FUNCTION(FBIT_OR); }
+    | FBIT_XOR '(' expr ')' { NORMAL_FUNCTION(FBIT_XOR); }
+    | FBIT_COUNT '(' expr ')' { NORMAL_FUNCTION(FBIT_COUNT); }
+    | FBIT_LENGTH '(' expr ')' { NORMAL_FUNCTION(FBIT_LENGTH); }
+    | FCAST '(' expr ')' { NORMAL_FUNCTION(FCAST); }
+    | FCEILING '(' expr ')' { NORMAL_FUNCTION(FCEILING); }
+    | FCENTROID '(' expr ')' { NORMAL_FUNCTION(FCENTROID); }
+    | FCHAR '(' expr ')' { NORMAL_FUNCTION(FCHAR); }
+    | FCHARACTER_LENGTH '(' expr ')' { NORMAL_FUNCTION(FCHARACTER_LENGTH); }
+    | FCOERCIBILITY '(' expr ')' { NORMAL_FUNCTION(FCOERCIBILITY); }
+    | FCOMPRESS '(' expr ')' { NORMAL_FUNCTION(FCOMPRESS); }
+    /* | FCONCAT '(' expr ')' { NORMAL_FUNCTION(FCONCAT); } */
+    | FCONCAT_WS '(' expr ')' { NORMAL_FUNCTION(FCONCAT_WS); }
+    | FCONNECTION_ID '(' expr ')' { NORMAL_FUNCTION(FCONNECTION_ID); }
+    | FCONV '(' expr ')' { NORMAL_FUNCTION(FCONV); }
+    | FCONVERT_TZ '(' expr ')' { NORMAL_FUNCTION(FCONVERT_TZ); }
+    | FCOS '(' expr ')' { NORMAL_FUNCTION(FCOS); }
+    | FCOT '(' expr ')' { NORMAL_FUNCTION(FCOT); }
+    | FCRC32 '(' expr ')' { NORMAL_FUNCTION(FCRC32); }
+    | FCROSSESS '(' expr ')' { NORMAL_FUNCTION(FCROSSESS); }
+    | FCOUNT '(' expr ')' { NORMAL_FUNCTION(FCOUNT); }
+    | FCHARSET '(' expr ')' { NORMAL_FUNCTION(FCHARSET); }
+    | FCOLLATION '(' expr ')' { NORMAL_FUNCTION(FCOLLATION); }
+    | FCURRENT_USER '(' expr ')' { NORMAL_FUNCTION(FCURRENT_USER); }
+    | FCURDATE '(' expr ')' { NORMAL_FUNCTION(FCURDATE); }
+    | FCURRENT_DATE '(' expr ')' { NORMAL_FUNCTION(FCURRENT_DATE); }
+    | FCURTIME '(' expr ')' { NORMAL_FUNCTION(FCURTIME); }
+    | FCURTIME_TIME '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIME); }
+    | FCURTIME_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIMESTAMP); }
+    | FDATE '(' expr ')' { NORMAL_FUNCTION(FDATE); }
+    | FDATEDIFF '(' expr ')' { NORMAL_FUNCTION(FDATEDIFF); }
+    | FDATENAME '(' expr ')' { NORMAL_FUNCTION(FDATENAME); }
+    | FDATEOFMONTH '(' expr ')' { NORMAL_FUNCTION(FDATEOFMONTH); }
+    | FDATEOFWEEK '(' expr ')' { NORMAL_FUNCTION(FDATEOFWEEK); }
+    | FDATEOFYEAR '(' expr ')' { NORMAL_FUNCTION(FDATEOFYEAR); }
+    | FDATE_ADD '(' expr ')' { NORMAL_FUNCTION(FDATE_ADD); }
+    | FDATE_SUB '(' expr ')' { NORMAL_FUNCTION(FDATE_SUB); }
+    | FDATE_FORMAT '(' expr ')' { NORMAL_FUNCTION(FDATE_FORMAT); }
+    | FDATABASE '(' expr ')' { NORMAL_FUNCTION(FDATABASE); }
+    | FDEFAULT '(' expr ')' { NORMAL_FUNCTION(FDEFAULT); }
+    | FDECODE '(' expr ')' { NORMAL_FUNCTION(FDECODE); }
+    | FDEGREES '(' expr ')' { NORMAL_FUNCTION(FDEGREES); }
+    | FDES_DECRYPT '(' expr ')' { NORMAL_FUNCTION(FDES_DECRYPT); }
+    | FDES_ENCRYPT '(' expr ')' { NORMAL_FUNCTION(FDES_ENCRYPT); }
+    | FDIMENSION '(' expr ')' { NORMAL_FUNCTION(FDIMENSION); }
+    | FISJOINT '(' expr ')' { NORMAL_FUNCTION(FISJOINT); }
+    | FELT '(' expr ')' { NORMAL_FUNCTION(FELT); }
+    | FENCODE '(' expr ')' { NORMAL_FUNCTION(FENCODE); }
+    | FENCRYPT '(' expr ')' { NORMAL_FUNCTION(FENCRYPT); }
+    | FENDPOINT '(' expr ')' { NORMAL_FUNCTION(FENDPOINT); }
+    | FENVELOPE '(' expr ')' { NORMAL_FUNCTION(FENVELOPE); }
+    | FEQUALS '(' expr ')' { NORMAL_FUNCTION(FEQUALS); }
+    | FEXP '(' expr ')' { NORMAL_FUNCTION(FEXP); }
+    | FEXPORT_SET '(' expr ')' { NORMAL_FUNCTION(FEXPORT_SET); }
+    | FEXTERIORRING '(' expr ')' { NORMAL_FUNCTION(FEXTERIORRING); }
+    | FEXTRACTVALUE '(' expr ')' { NORMAL_FUNCTION(FEXTRACTVALUE); }
+    | FFIELD '(' expr ')' { NORMAL_FUNCTION(FFIELD); }
+    | FFIND_IN_SET '(' expr ')' { NORMAL_FUNCTION(FFIND_IN_SET); }
+    | FFLOOR '(' expr ')' { NORMAL_FUNCTION(FFLOOR); }
+    | FFORMAT '(' expr ')' { NORMAL_FUNCTION(FFORMAT); }
+    | FFOUND_ROWS '(' expr ')' { NORMAL_FUNCTION(FFOUND_ROWS); }
+    | FFROM_DAYS '(' expr ')' { NORMAL_FUNCTION(FFROM_DAYS); }
+    | FFROM_UNIXTIME '(' expr ')' { NORMAL_FUNCTION(FFROM_UNIXTIME); }
+    | FGET_FORMAT '(' expr ')' { NORMAL_FUNCTION(FGET_FORMAT); }
+    | FGEOMCOLLFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMCOLLFROMTEXT); }
+    | FGEOMCOLLFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMCOLLFROMWKB); }
+    | FGEOMETRYCOLLECTIONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMTEXT); }
+    | FGEOMETRYCOLLECTIONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMWKB); }
+    | FGEOMETRYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYFROMTEXT); }
+    | FGEOMETRYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYFROMWKB); }
+    | FGEOMETRYN '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYN); }
+    | FGEOMETRYTYPE '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYTYPE); }
+    | FGEOMFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMFROMTEXT); }
+    | FGEOMFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMFROMWKB); }
+    | FGET_LOCK '(' expr ')' { NORMAL_FUNCTION(FGET_LOCK); }
+    | FGLENGTH '(' expr ')' { NORMAL_FUNCTION(FGLENGTH); }
+    | FGREATEST '(' expr ')' { NORMAL_FUNCTION(FGREATEST); }
+    | FHEX '(' expr ')' { NORMAL_FUNCTION(FHEX); }
+    | FHOUR '(' expr ')' { NORMAL_FUNCTION(FHOUR); }
+    | FINSERT '(' expr ')' { NORMAL_FUNCTION(FINSERT); }
+    | FINSTR '(' expr ')' { NORMAL_FUNCTION(FINSTR); }
+    /* | FIFNULL '(' expr ')' { NORMAL_FUNCTION(FIFNULL); } */
+    | FINET_ATON '(' expr ')' { NORMAL_FUNCTION(FINET_ATON); }
+    | FINET_NTOA '(' expr ')' { NORMAL_FUNCTION(FINET_NTOA); }
+    | FINTERIORRINGN '(' expr ')' { NORMAL_FUNCTION(FINTERIORRINGN); }
+    | FINTERSECTS '(' expr ')' { NORMAL_FUNCTION(FINTERSECTS); }
+    | FISCLOSED '(' expr ')' { NORMAL_FUNCTION(FISCLOSED); }
+    | FISEMPTY '(' expr ')' { NORMAL_FUNCTION(FISEMPTY); }
+    | FISNULL '(' expr ')' { NORMAL_FUNCTION(FISNULL); }
+    | FISSIMPLE '(' expr ')' { NORMAL_FUNCTION(FISSIMPLE); }
+    | FIS_FREE_LOCK '(' expr ')' { NORMAL_FUNCTION(FIS_FREE_LOCK); }
+    | FIS_USED_LOCK '(' expr ')' { NORMAL_FUNCTION(FIS_USED_LOCK); }
+    | FLAST_DAY '(' expr ')' { NORMAL_FUNCTION(FLAST_DAY); }
+    | FLAST_INSERT_ID '(' expr ')' { NORMAL_FUNCTION(FLAST_INSERT_ID); }
+    | FLCASE '(' expr ')' { NORMAL_FUNCTION(FLCASE); }
+    | FLEFT '(' expr ')' { NORMAL_FUNCTION(FLEFT); }
+    | FLENGTH '(' expr ')' { NORMAL_FUNCTION(FLENGTH); }
+    | FLINEFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FLINEFROMTEXT); }
+    | FLINEFROMWKB '(' expr ')' { NORMAL_FUNCTION(FLINEFROMWKB); }
+    | FLINESTRINGFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FLINESTRINGFROMTEXT); }
+    | FLINESTRINGFROMWKB '(' expr ')' { NORMAL_FUNCTION(FLINESTRINGFROMWKB); }
+    | FLN '(' expr ')' { NORMAL_FUNCTION(FLN); }
+    | FLOAD_FILE '(' expr ')' { NORMAL_FUNCTION(FLOAD_FILE); }
+    | FLOCATE '(' expr ')' { NORMAL_FUNCTION(FLOCATE); }
+    | FLOG '(' expr ')' { NORMAL_FUNCTION(FLOG); }
+    | FLOG10 '(' expr ')' { NORMAL_FUNCTION(FLOG10); }
+    | FLOG2 '(' expr ')' { NORMAL_FUNCTION(FLOG2); }
+    | FLOWER '(' expr ')' { NORMAL_FUNCTION(FLOWER); }
+    | FLPAD '(' expr ')' { NORMAL_FUNCTION(FLPAD); }
+    | FLTRIM '(' expr ')' { NORMAL_FUNCTION(FLTRIM); }
+    | FLOCALTIME '(' expr ')' { NORMAL_FUNCTION(FLOCALTIME); }
+    | FLOCALTIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FLOCALTIMESTAMP); }
+    | FMAKEDATE '(' expr ')' { NORMAL_FUNCTION(FMAKEDATE); }
+    | FMAKETIME '(' expr ')' { NORMAL_FUNCTION(FMAKETIME); }
+    | FMAKE_SET '(' expr ')' { NORMAL_FUNCTION(FMAKE_SET); }
+    | FMASTER_POS_WAIT '(' expr ')' { NORMAL_FUNCTION(FMASTER_POS_WAIT); }
+    | FMBRCONTAINS '(' expr ')' { NORMAL_FUNCTION(FMBRCONTAINS); }
+    | FMBRDISJOINT '(' expr ')' { NORMAL_FUNCTION(FMBRDISJOINT); }
+    | FMBREQUAL '(' expr ')' { NORMAL_FUNCTION(FMBREQUAL); }
+    | FMBRINTERSECTS '(' expr ')' { NORMAL_FUNCTION(FMBRINTERSECTS); }
+    | FMBROVERLAPS '(' expr ')' { NORMAL_FUNCTION(FMBROVERLAPS); }
+    | FMBRTOUCHES '(' expr ')' { NORMAL_FUNCTION(FMBRTOUCHES); }
+    | FMBRWITHIN '(' expr ')' { NORMAL_FUNCTION(FMBRWITHIN); }
+    | FMD5 '(' expr ')' { NORMAL_FUNCTION(FMD5); }
+    | FMLINEFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMLINEFROMTEXT); }
+    | FMLINEFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMLINEFROMWKB); }
+    | FMONTHNAME '(' expr ')' { NORMAL_FUNCTION(FMONTHNAME); }
+    | FMPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMPOINTFROMTEXT); }
+    | FMPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMPOINTFROMWKB); }
+    | FMPOLYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMPOLYFROMTEXT); }
+    | FMPOLYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMPOLYFROMWKB); }
+    | FMULTILINESTRINGFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMTEXT); }
+    | FMULTILINESTRINGFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMWKB); }
+    | FMULTIPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTIPOINTFROMTEXT); }
+    | FMULTIPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTIPOINTFROMWKB); }
+    | FMULTIPOLYGONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMTEXT); }
+    | FMULTIPOLYGONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMWKB); }
+    | FMICROSECOND '(' expr ')' { NORMAL_FUNCTION(FMICROSECOND); }
+    | FMINUTE '(' expr ')' { NORMAL_FUNCTION(FMINUTE); }
+    | FMONTH '(' expr ')' { NORMAL_FUNCTION(FMONTH); }
+    | FGROUP_CONCAT '(' expr ')' { NORMAL_FUNCTION(FGROUP_CONCAT); }
+    | FMAX '(' expr ')' { NORMAL_FUNCTION(FMAX); }
+    | FMID '(' expr ')' { NORMAL_FUNCTION(FMID); }
+    | FMIN '(' expr ')' { NORMAL_FUNCTION(FMIN); }
+    | FMOD '(' expr ')' { NORMAL_FUNCTION(FMOD); }
+    | FNOW '(' expr ')' { NORMAL_FUNCTION(FNOW); }
+    | FNAME_CONST '(' expr ')' { NORMAL_FUNCTION(FNAME_CONST); }
+    | FNULLIF '(' expr ')' { NORMAL_FUNCTION(FNULLIF); }
+    | FNUMGEOMETRIES '(' expr ')' { NORMAL_FUNCTION(FNUMGEOMETRIES); }
+    | FNUMINTERIORRINGS '(' expr ')' { NORMAL_FUNCTION(FNUMINTERIORRINGS); }
+    | FNUMPOINTS '(' expr ')' { NORMAL_FUNCTION(FNUMPOINTS); }
+    | FOCT '(' expr ')' { NORMAL_FUNCTION(FOCT); }
+    | FOCTET_LENGTH '(' expr ')' { NORMAL_FUNCTION(FOCTET_LENGTH); }
+    | FORD '(' expr ')' { NORMAL_FUNCTION(FORD); }
+    | FOVERLAPS '(' expr ')' { NORMAL_FUNCTION(FOVERLAPS); }
+    | FOLD_PASSWORD '(' expr ')' { NORMAL_FUNCTION(FOLD_PASSWORD); }
+    | FPERIOD_ADD '(' expr ')' { NORMAL_FUNCTION(FPERIOD_ADD); }
+    | FPERIOD_DIFF '(' expr ')' { NORMAL_FUNCTION(FPERIOD_DIFF); }
+    | FPI '(' expr ')' { NORMAL_FUNCTION(FPI); }
+    | FPOSITION '(' expr ')' { NORMAL_FUNCTION(FPOSITION); }
+    | FPASSWORD '(' expr ')' { NORMAL_FUNCTION(FPASSWORD); }
+    | FPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOINTFROMTEXT); }
+    | FPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOINTFROMWKB); }
+    | FPOINTN '(' expr ')' { NORMAL_FUNCTION(FPOINTN); }
+    | FPOLYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOLYFROMTEXT); }
+    | FPOLYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOLYFROMWKB); }
+    | FPOLYGONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOLYGONFROMTEXT); }
+    | FPOLYGONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOLYGONFROMWKB); }
+    | FPOW '(' expr ')' { NORMAL_FUNCTION(FPOW); }
+    | FPOWER '(' expr ')' { NORMAL_FUNCTION(FPOWER); }
+    | FQUARTER '(' expr ')' { NORMAL_FUNCTION(FQUARTER); }
+    | FQUOTE '(' expr ')' { NORMAL_FUNCTION(FQUOTE); }
+    | FRADIANS '(' expr ')' { NORMAL_FUNCTION(FRADIANS); }
+    | FRAND '(' expr ')' { NORMAL_FUNCTION(FRAND); }
+    | FROUND '(' expr ')' { NORMAL_FUNCTION(FROUND); }
+    | FROW_COUNT '(' expr ')' { NORMAL_FUNCTION(FROW_COUNT); }
+    | FREPEAT '(' expr ')' { NORMAL_FUNCTION(FREPEAT); }
+    | FREPLACE '(' expr ')' { NORMAL_FUNCTION(FREPLACE); }
+    | FREVERSE '(' expr ')' { NORMAL_FUNCTION(FREVERSE); }
+    | FRIGHT '(' expr ')' { NORMAL_FUNCTION(FRIGHT); }
+    | FRPAD '(' expr ')' { NORMAL_FUNCTION(FRPAD); }
+    | FRTRIM '(' expr ')' { NORMAL_FUNCTION(FRTRIM); }
+    | FRELEASE_LOCK '(' expr ')' { NORMAL_FUNCTION(FRELEASE_LOCK); }
+    | FSEC_TO_TIME '(' expr ')' { NORMAL_FUNCTION(FSEC_TO_TIME); }
+    | FSEC_TO_DATE '(' expr ')' { NORMAL_FUNCTION(FSEC_TO_DATE); }
+    | FSHA '(' expr ')' { NORMAL_FUNCTION(FSHA); }
+    | FSHA1 '(' expr ')' { NORMAL_FUNCTION(FSHA1); }
+    | FSIGN '(' expr ')' { NORMAL_FUNCTION(FSIGN); }
+    | FSIN '(' expr ')' { NORMAL_FUNCTION(FSIN); }
+    | FSLEEP '(' expr ')' { NORMAL_FUNCTION(FSLEEP); }
+    | FSCHEMA '(' expr ')' { NORMAL_FUNCTION(FSCHEMA); }
+    | FSOUNDEX '(' expr ')' { NORMAL_FUNCTION(FSOUNDEX); }
+    | FSPACE '(' expr ')' { NORMAL_FUNCTION(FSPACE); }
+    | FSQRT '(' expr ')' { NORMAL_FUNCTION(FSQRT); }
+    | FSRID '(' expr ')' { NORMAL_FUNCTION(FSRID); }
+    | FSTARTPOINT '(' expr ')' { NORMAL_FUNCTION(FSTARTPOINT); }
+    | FSTRCMP '(' expr ')' { NORMAL_FUNCTION(FSTRCMP); }
+    | FSTR_TO_DATE '(' expr ')' { NORMAL_FUNCTION(FSTR_TO_DATE); }
+    | FSECOND '(' expr ')' { NORMAL_FUNCTION(FSECOND); }
+    | FSUBTIME '(' expr ')' { NORMAL_FUNCTION(FSUBTIME); }
+    /*| FSUBSTRING '(' expr ')' { NORMAL_FUNCTION(FSUBSTRING); } */
+    | FSUBSTRING_INDEX '(' expr ')' { NORMAL_FUNCTION(FSUBSTRING_INDEX); }
+    | FSESSION_USER '(' expr ')' { NORMAL_FUNCTION(FSESSION_USER); }
+    | FSTD '(' expr ')' { NORMAL_FUNCTION(FSTD); }
+    | FSTDDEV '(' expr ')' { NORMAL_FUNCTION(FSTDDEV); }
+    | FSTDDEV_POP '(' expr ')' { NORMAL_FUNCTION(FSTDDEV_POP); }
+    | FSTDDEV_SAMP '(' expr ')' { NORMAL_FUNCTION(FSTDDEV_SAMP); }
+    | FSUBDATE '(' expr ')' { NORMAL_FUNCTION(FSUBDATE); }
+    | FSUM '(' expr ')' { NORMAL_FUNCTION(FSUM); }
+    | FSYSDATE '(' expr ')' { NORMAL_FUNCTION(FSYSDATE); }
+    | FSYSTEM_USER '(' expr ')' { NORMAL_FUNCTION(FSYSTEM_USER); }
+    | FTAN '(' expr ')' { NORMAL_FUNCTION(FTAN); }
+    | FTIMEDIFF '(' expr ')' { NORMAL_FUNCTION(FTIMEDIFF); }
+    | FTIME_FORMAT '(' expr ')' { NORMAL_FUNCTION(FTIME_FORMAT); }
+    | FTIME_TO_SEC '(' expr ')' { NORMAL_FUNCTION(FTIME_TO_SEC); }
+    | FTRUNCATE '(' expr ')' { NORMAL_FUNCTION(FTRUNCATE); }
+    | FTOUCHES '(' expr ')' { NORMAL_FUNCTION(FTOUCHES); }
+    | FTO_DAYS '(' expr ')' { NORMAL_FUNCTION(FTO_DAYS); }
+    /*| FTRIM '(' expr ')' { NORMAL_FUNCTION(FTRIM); } */
+    | FTIME '(' expr ')' { NORMAL_FUNCTION(FTIME); }
+    | FTIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMP); }
+    | FTIMESTAMPADD '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMPADD); }
+    | FTIMESTAMPDIFF '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMPDIFF); }
+    | FVARIANCE '(' expr ')' { NORMAL_FUNCTION(FVARIANCE); }
+    | FVAR_POP '(' expr ')' { NORMAL_FUNCTION(FVAR_POP); }
+    | FVAR_SAMP '(' expr ')' { NORMAL_FUNCTION(FVAR_SAMP); }
+    | FUCASE '(' expr ')' { NORMAL_FUNCTION(FUCASE); }
+    | FUNCOMPRESS '(' expr ')' { NORMAL_FUNCTION(FUNCOMPRESS); }
+    | FUNCOMPRESSED_LENGTH '(' expr ')' { NORMAL_FUNCTION(FUNCOMPRESSED_LENGTH); }
+    | FUNHEX '(' expr ')' { NORMAL_FUNCTION(FUNHEX); }
+    | FUSER '(' expr ')' { NORMAL_FUNCTION(FUSER); }
+    | FUNIX_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FUNIX_TIMESTAMP); }
+    | FUPDATEXML '(' expr ')' { NORMAL_FUNCTION(FUPDATEXML); }
+    | FUPPER '(' expr ')' { NORMAL_FUNCTION(FUPPER); }
+    | FUUID '(' expr ')' { NORMAL_FUNCTION(FUUID); }
+    | FUUID_SHORT '(' expr ')' { NORMAL_FUNCTION(FUUID_SHORT); }
+    | FVERSION '(' expr ')' { NORMAL_FUNCTION(FVERSION); }
+    | FUTC_DATE '(' expr ')' { NORMAL_FUNCTION(FUTC_DATE); }
+    | FUTC_TIME '(' expr ')' { NORMAL_FUNCTION(FUTC_TIME); }
+    | FUTC_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FUTC_TIMESTAMP); }
+    | FWEEK '(' expr ')' { NORMAL_FUNCTION(FWEEK); }
+    | FWEEKDAY '(' expr ')' { NORMAL_FUNCTION(FWEEKDAY); }
+    | FWEEKOFYEAR '(' expr ')' { NORMAL_FUNCTION(FWEEKOFYEAR); }
+    | FYEAR '(' expr ')' { NORMAL_FUNCTION(FYEAR); }
+    | FYEARWEEK '(' expr ')' { NORMAL_FUNCTION(FYEARWEEK); }
+    | FX '(' expr ')' { NORMAL_FUNCTION(FX); }
+    | FY '(' expr ')' { NORMAL_FUNCTION(FY); }
 
 expr: FSUBSTRING '(' val_list ')' {
         debug("CALL SUBSTR");
         Item *i = calloc(1, sizeof(*i));
         i->right = $3;
         i->token1 = FSUBSTRING;
+        $$ = i;
+    }
+    |FCONCAT '(' val_list ')' {
+        debug("CALL SUBSTR");
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FCONCAT;
         $$ = i;
     }
     | FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
@@ -1559,6 +2055,13 @@ expr: FSUBSTRING '(' val_list ')' {
         $$ = i;
     }
     | FTRIM '(' trim_ltb expr FROM val_list ')' { debug("CALL 3 TRIM"); }
+    | FIFNULL'(' val_list')'            {
+        debug("CALL IFNULL");
+        Item *i = calloc(1, sizeof(*i));
+        i->right = $3;
+        i->token1 = FIFNULL;
+        $$ = i;
+    }
     ;
 
 trim_ltb: LEADING { debug("INT 1"); }
@@ -1581,15 +2084,72 @@ interval_exp: INTERVAL expr DAY_HOUR { debug("NUMBER 1"); }
    | INTERVAL expr HOUR_SECOND { debug("NUMBER 9"); }
    ;
 
-expr: CASE expr case_list END           { debug("CASEVAL %d 0", $3); }
-   |  CASE expr case_list ELSE expr END { debug("CASEVAL %d 1", $3); }
-   |  CASE case_list END                { debug("CASE %d 0", $2); }
-   |  CASE case_list ELSE expr END      { debug("CASE %d 1", $2); }
-   ;
+expr: CASE expr case_list END               {
+    debug("CASE");
+    Item *c = calloc(1, sizeof(*c));
+    c->token1 = CASE;
+    c->left = $2;
+    c->next = $3;
+    $$ = c;
 
-case_list: WHEN expr THEN expr     { $$ = 1; }
-         | case_list WHEN expr THEN expr { $$ = $1+1; } 
-   ;
+    } |  CASE expr case_list ELSE expr END  {
+    debug("CASE ELSE");
+    Item *c = calloc(1, sizeof(*c));
+    c->token1 = CASE;
+    c->token2 = ELSE;
+    c->left = $2;
+    c->right = $5;
+    c->next = $3;
+    $$ = c;
+
+    } |  CASE case_list END                 {
+    debug("CASE ");
+    Item *c = calloc(1, sizeof(*c));
+    c->token1 = CASE;
+    c->next = $2;
+    $$ = c;
+    
+    } |  CASE case_list ELSE expr END       {
+    debug("CASE ELSE");
+    Item *c = calloc(1, sizeof(*c));
+    c->token1 = CASE;
+    c->token2 = ELSE;
+    c->right = $4;
+    c->next = $2;
+    $$ = c;
+
+    };
+
+case_list: WHEN expr THEN expr     {
+        debug("WHEN THEN ");
+
+        Item *then = calloc(1, sizeof(*then));
+        then->token1 = THEN;
+        then->left = $4;
+
+        Item *i= calloc(1, sizeof(*i));
+        i->token1 = WHEN;
+        i->left = $2;
+
+        list *l = listCreate();
+        listAddNodeTail(l, i);
+        listAddNodeTail(l, then);
+        $$ = l;
+    } | case_list WHEN expr THEN expr {
+        debug("WHEN THEN ");
+
+        Item *then = calloc(1, sizeof(*then));
+        then->token1 = THEN;
+        then->left = $3;
+
+        Item *i= calloc(1, sizeof(*i));
+        i->token1 = WHEN;
+        i->left = $5;
+
+        listAddNodeTail($1, i);
+        listAddNodeTail($1, then);
+        $$ = $1;
+    };
 
 expr: expr LIKE expr { 
         debug("LIKE");
@@ -1640,11 +2200,12 @@ expr: BINARY expr %prec UMINUS { debug("STRTOBIN"); }
 void debug(char *s, ...) {
     va_list ap;
     va_start(ap, s);
-    /*
+    /* 
     printf("rpn: ");
     vfprintf(stdout, s, ap);
     printf("\n");
     */
+    
 }
 
 void

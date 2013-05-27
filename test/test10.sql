@@ -1,2 +1,1 @@
 select  a from b;
-
