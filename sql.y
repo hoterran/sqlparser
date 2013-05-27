@@ -23,7 +23,22 @@ void debug(char *s, ...);
         (yyval.item) = i;}\
         while(0)
 
-//extern int yydebug = 1;
+#define NORMAL_FUNCTION_WILD(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->name = strdup("*");\
+        i->token1 = f;\
+        (yyval.item) = i;}\
+        while(0)
+
+#define NORMAL_FUNCTION_NO_PARAM(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->token1 = f;\
+        (yyval.item) = i;}\
+        while(0)
+
+extern int yydebug = 1;
 
 %}
 
@@ -1804,12 +1819,13 @@ expr: FABS '(' expr ')' { NORMAL_FUNCTION(FABS); }
     | FCRC32 '(' expr ')' { NORMAL_FUNCTION(FCRC32); }
     | FCROSSESS '(' expr ')' { NORMAL_FUNCTION(FCROSSESS); }
     | FCOUNT '(' expr ')' { NORMAL_FUNCTION(FCOUNT); }
+    | FCOUNT '(' '*' ')' { NORMAL_FUNCTION_WILD(FCOUNT); }
     | FCHARSET '(' expr ')' { NORMAL_FUNCTION(FCHARSET); }
     | FCOLLATION '(' expr ')' { NORMAL_FUNCTION(FCOLLATION); }
     | FCURRENT_USER '(' expr ')' { NORMAL_FUNCTION(FCURRENT_USER); }
-    | FCURDATE '(' expr ')' { NORMAL_FUNCTION(FCURDATE); }
+    | FCURDATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURDATE); }
     | FCURRENT_DATE '(' expr ')' { NORMAL_FUNCTION(FCURRENT_DATE); }
-    | FCURTIME '(' expr ')' { NORMAL_FUNCTION(FCURTIME); }
+    | FCURTIME '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURTIME); }
     | FCURTIME_TIME '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIME); }
     | FCURTIME_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIMESTAMP); }
     | FDATE '(' expr ')' { NORMAL_FUNCTION(FDATE); }
@@ -1992,6 +2008,7 @@ expr: FABS '(' expr ')' { NORMAL_FUNCTION(FABS); }
     | FSTDDEV_SAMP '(' expr ')' { NORMAL_FUNCTION(FSTDDEV_SAMP); }
     | FSUBDATE '(' expr ')' { NORMAL_FUNCTION(FSUBDATE); }
     | FSUM '(' expr ')' { NORMAL_FUNCTION(FSUM); }
+    | FSUM'(' '*' ')' { NORMAL_FUNCTION_WILD(FSUM); }
     | FSYSDATE '(' expr ')' { NORMAL_FUNCTION(FSYSDATE); }
     | FSYSTEM_USER '(' expr ')' { NORMAL_FUNCTION(FSYSTEM_USER); }
     | FTAN '(' expr ')' { NORMAL_FUNCTION(FTAN); }
@@ -2200,11 +2217,11 @@ expr: BINARY expr %prec UMINUS { debug("STRTOBIN"); }
 void debug(char *s, ...) {
     va_list ap;
     va_start(ap, s);
-    /* 
+     
     printf("rpn: ");
     vfprintf(stdout, s, ap);
     printf("\n");
-    */
+    
     
 }
 

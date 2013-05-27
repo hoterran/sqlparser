@@ -9,8 +9,6 @@
 
 #include "func.h"
 
-/* TODO revert to hash table */
-
 char funcArray[FEND];
 
 char* tmp(int cmp) {
