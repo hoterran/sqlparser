@@ -18,16 +18,24 @@ void debug(char *s, ...);
 #define NORMAL_FUNCTION(f) do {\
         debug ("CALL %s", #f);\
         Item *i = calloc(1, sizeof(*i));\
-        i->right = (yyvsp[(3) - (4)].item);\
         i->token1 = f;\
+        i->right = (yyvsp[(3) - (4)].item);\
+        (yyval.item) = i;}\
+        while(0)
+
+#define NORMAL_FUNCTION_ANY_PARAM(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->token1 = f;\
+        i->right = (yyvsp[(3) - (4)].item);\
         (yyval.item) = i;}\
         while(0)
 
 #define NORMAL_FUNCTION_WILD(f) do {\
         debug ("CALL %s", #f);\
         Item *i = calloc(1, sizeof(*i));\
-        i->name = strdup("*");\
         i->token1 = f;\
+        i->name = strdup("*");\
         (yyval.item) = i;}\
         while(0)
 
@@ -38,7 +46,7 @@ void debug(char *s, ...);
         (yyval.item) = i;}\
         while(0)
 
-extern int yydebug = 1;
+//extern int yydebug = 1;
 
 %}
 
@@ -163,6 +171,7 @@ extern int yydebug = 1;
 %token FULLTEXT
 %token GRANT
 %token GROUP
+%token GLOBAL
 %token HAVING
 %token HIGH_PRIORITY
 %token HOUR_MICROSECOND
@@ -250,7 +259,11 @@ extern int yydebug = 1;
 %token SELECT
 %token SENSITIVE
 %token SEPARATOR
+%token SESSION
 %token SET
+%token SETNAMES
+%token SETCHARACTER
+%token SETPASSWORD
 %token SHOW
 %token SMALLINT
 %token SOME
@@ -292,6 +305,7 @@ extern int yydebug = 1;
 %token UTC_DATE
 %token UTC_TIME
 %token UTC_TIMESTAMP
+%token VARIABLES
 %token VALUES
 %token VARBINARY
 %token VARCHAR
@@ -361,7 +375,7 @@ extern int yydebug = 1;
 %token FCURRENT_DATE
 %token FCURTIME
 %token FCURTIME_TIME
-%token FCURTIME_TIMESTAMP
+%token FCURRENT_TIMESTAMP
 
 %token FDATE
 %token FDATEDIFF
@@ -373,12 +387,20 @@ extern int yydebug = 1;
 %token FDATE_SUB
 %token FDATE_FORMAT
 %token FDATABASE
+
+%token FDAY
+%token FDAYNAME
+%token FDAYOFMONTH
+%token FDAYOFWEEK
+%token FDAYOFYEAR
+
 %token FDEFAULT
 %token FDECODE
 %token FDEGREES
 %token FDES_DECRYPT
 %token FDES_ENCRYPT
 %token FDIMENSION
+
 %token FISJOINT
 
 %token FELT
@@ -389,7 +411,7 @@ extern int yydebug = 1;
 %token FEQUALS
 %token FEXP
 %token FEXPORT_SET
-%token FEXTRACT;
+%token FEXTRACT
 %token FEXTERIORRING
 %token FEXTRACTVALUE
 
@@ -422,6 +444,7 @@ extern int yydebug = 1;
 %token FINSERT
 %token FINSTR
 %token FIFNULL
+%token FIF
 %token FINET_ATON
 %token FINET_NTOA
 %token FINTERIORRINGN
@@ -515,7 +538,6 @@ extern int yydebug = 1;
 %token FPOLYFROMWKB
 %token FPOLYGONFROMTEXT
 %token FPOLYGONFROMWKB
-%token FPOW
 %token FPOWER
 
 %token FQUARTER
@@ -608,14 +630,15 @@ extern int yydebug = 1;
 %token BITOR_OP BITXOR_OP BITAND_OP
 
 %type <stmt> select_stmt
+%type <intval> show_stmt set_stmt
 %type <stmt> table_subquery
 %type <listval> val_list opt_val_list case_list
-%type <item> expr select_expr 
-%type <intval> select_opts select_expr_list 
+%type <item> expr select_expr set_expr set_password_opt
+%type <intval> select_opts select_expr_list  set_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
 %type <intval> left_or_right opt_left_or_right_outer column_list
-%type <intval> index_list opt_for_join
+%type <intval> index_list opt_for_join show_opt
 %type <strval> opt_as_alias
 
 %type <intval> delete_opts delete_list
@@ -623,6 +646,7 @@ extern int yydebug = 1;
 %type <intval> insert_asgn_list opt_if_not_exists update_opts update_asgn_list
 %type <intval> opt_temporary opt_length opt_binary opt_uz enum_list
 %type <intval> column_atts data_type opt_ignore_replace create_col_list
+%type <strval> set_misc_key_opt 
 
 %start stmt_list
 
@@ -792,7 +816,6 @@ select_opts:                          { $$ = 0; }
 | select_opts SQL_CALC_FOUND_ROWS { if($$ & 0200) yyerror("duplicate SQL_CALC_FOUND_ROWS option"); $$ = $1 | 0200; }
     ;
 
-
 select_expr_list: select_expr {
         debug("#####%p\n", $1);
         listAddNodeTail(curStmt->select_expr_list, $1);
@@ -809,8 +832,7 @@ select_expr_list: select_expr {
         i->token1 = NAME;
         listAddNodeTail(curStmt->select_expr_list, i);
         $$ = 1;
-    }
-    ;
+    };
 
 select_expr: expr opt_as_alias  {
         debug("SIMPLE SELECT");
@@ -819,6 +841,12 @@ select_expr: expr opt_as_alias  {
             free($2);
         }
         $$ = $1;
+    } | NAME '.' '*' { debug("SELECT %s.*", $1);
+        Item *i = calloc(1, sizeof(*i));
+        i->prefix = strdup($1);
+        i->name = strdup("*");
+        i->token1 = NAME;
+        $$ = i;
     }
     ;
 
@@ -978,6 +1006,18 @@ delete_stmt: delete_reduce_stmt delete_opts FROM NAME
     }
     ;
 
+delete_stmt: delete_reduce_stmt delete_opts FROM NAME '.' NAME
+    opt_where opt_orderby opt_limit {
+        debug("DELETEONE %d %s", $2, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($4);
+        t->name = strdup($6);
+        free($4);
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->sql_command = SQLCOM_DELETE;
+    }
+    ;
+
 delete_opts: delete_opts LOW_PRIORITY { $$ = $1 + 01; }
    | delete_opts QUICK { $$ = $1 + 02; }
    | delete_opts IGNORE { $$ = $1 + 04; }
@@ -1034,6 +1074,19 @@ insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
         Table *t = calloc(1, sizeof(*t));
         t->name = strdup($4);
         free($4);
+        listAddNodeTail(curStmt->joinList, t);
+    }
+    ;
+insert_stmt: insert_reduce_stmt insert_opts opt_into NAME '.' NAME
+     opt_col_names
+     insert_value_reduce_stmt insert_vals_list
+     opt_ondupupdate {
+        debug("INSERTVALS %d %d %s", $2, $9, $4); 
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($6);
+        t->db = strdup($4);
+        free($4);
+        free($6);
         listAddNodeTail(curStmt->joinList, t);
     }
     ;
@@ -1099,6 +1152,20 @@ insert_stmt: insert_reduce_stmt insert_opts opt_into NAME opt_col_names
         curStmt = curStmt->father;
         listAddNodeTail(curStmt->joinList, t);
         curStmt->valueSelect = $6;
+    };
+
+insert_stmt: insert_reduce_stmt insert_opts opt_into NAME '.' NAME opt_col_names
+    select_stmt
+    opt_ondupupdate {
+        debug("INSERTSELECT %d %s From child %p to father %p", $2, $4, curStmt, curStmt->father);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($6);
+        t->db = strdup($4);
+        free($4);
+        free($6);
+        curStmt = curStmt->father;
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->valueSelect = $8;
     };
 
 insert_asgn_list:
@@ -1414,8 +1481,103 @@ opt_ignore_replace: /* nil */ { $$ = 0; }
    ;
 
 opt_temporary:   /* nil */ { $$ = 0; }
-   | TEMPORARY { $$ = 1;}
-   ;
+    | TEMPORARY { $$ = 1;}
+    ;
+
+stmt: show_stmt { debug("stmt");}
+    ;
+
+show_stmt: SHOW show_opt VARIABLES {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = $2;
+        curStmt->show = i;
+        stmt->sql_command = SQLCOM_SHOW_VARIABLES;
+    } | SHOW show_opt VARIABLES LIKE STRING {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = $2;
+        i->name = strdup($5);
+        free($5);
+        curStmt->show = i;
+
+        stmt->sql_command = SQLCOM_SHOW_VARIABLES;
+    } | SHOW show_opt VARIABLES LIKE NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = $2;
+        i->name = strdup($5);
+        free($5);
+        curStmt->show = i;
+
+        stmt->sql_command = SQLCOM_SHOW_VARIABLES;
+    };
+
+show_opt: GLOBAL {$$ = GLOBAL;}
+    | SESSION {$$ = SESSION;}
+    | /**/ {$$ = 0;}
+    ;
+
+    /* DESC */
+stmt: desc_stmt { debug("STMT");}
+    ;
+
+desc_stmt: DESC NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        i->token1 = NAME;
+        free($2);
+        curStmt->desc = i;
+
+        stmt->sql_command = SQLCOM_SHOW_TABLES;
+    } | DESC NAME '.' NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($4);
+        i->prefix = strdup($2);
+        i->token1 = NAME;
+        free($2);
+        free($4);
+        curStmt->desc = i;
+
+        stmt->sql_command = SQLCOM_SHOW_FIELDS;
+    }
 
    /**** set user variables ****/
 
@@ -1433,30 +1595,200 @@ set_reduce_stmt: SET {
         curStmt = stmt;
     }
     ;
-set_stmt: set_reduce_stmt set_list 
-    { curStmt->sql_command = SQLCOM_SET_OPTION; }
-    ;
+set_stmt: set_reduce_stmt set_list {
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+    } | SETNAMES DEFAULT {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
 
-set_list: set_expr | set_list ',' set_expr ;
-
-set_expr:
-    USERVAR COMPARISON expr { if ($2 != 4) yyerror("bad set to @%s", $1);
-        debug("SET %s", $1); free($1); }
-    | USERVAR ASSIGN expr { debug("SET %s", $1); free($1); }
-    | NAME COMPARISON expr { debug ("SET %s", $1);
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET NAMES ");
         Item *i = calloc(1, sizeof(*i));
-        i->name = strdup($1);
-        free($1);
-        i->token1 = NAME;
+        i->token1 = SETNAMES;
+        i->name = strdup("NAMES");
+
+        Item *i2 = calloc(1, sizeof(*i2));
+        i2->token1 = NAME;
+        i2->name = strdup("DEFAULT");
+
+        listAddNodeTail(curStmt->setList, i); 
+        listAddNodeTail(curStmt->setList, i2); 
+
+        $$=0;
+    } | SETNAMES NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET NAMES ");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETNAMES;
+
+        Item *i2 = calloc(1, sizeof(*i2));
+        i2->token1 = NAME;
+        i2->name = strdup($2);
+        free($2);
+
+        listAddNodeTail(curStmt->setList, i); 
+        listAddNodeTail(curStmt->setList, i2); 
+
+        $$=0;
+    } | SETPASSWORD set_password_opt COMPARISON expr {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET LIST PASSWORD ");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETPASSWORD;
+
+        listAddNodeTail(curStmt->setList, i); 
+        listAddNodeTail(curStmt->setList, $4); 
+        $$ = 0;
+    } | SETCHARACTER SET DEFAULT {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET CHARACTER default ");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETCHARACTER;
+        i->name = strdup("character");
+
+        Item *i2 = calloc(1, sizeof(*i2));
+        i2->token1 = NAME;
+        i2->name = strdup("default");
+
+        listAddNodeTail(curStmt->setList, i); 
+        listAddNodeTail(curStmt->setList, i2); 
+        $$ = 1;
+    } | SETCHARACTER SET NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET CHARACTER SET %s", $3);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETCHARACTER;
+        i->name = strdup("character");
+
+        Item *i2 = calloc(1, sizeof(*i2));
+        i2->token1 = NAME;
+        i2->name = strdup($3);
+
+        listAddNodeTail(curStmt->setList, i); 
+        listAddNodeTail(curStmt->setList, i2); 
+        $$ = 1;
+    };
+
+set_list: set_expr {
+        debug("SET LIST1 ");
+        listAddNodeTail(curStmt->setList, $1); 
+        $$ = 0;
+    } | set_list ',' set_expr {
+        debug("SET LIST2 ");
+        listAddNodeTail(curStmt->setList, $3); 
+        $$ = 1;
+    };
+
+set_password_opt:
+    FOR NAME {$$ = NULL} | {$$= NULL};
+
+set_expr: show_opt USERVAR COMPARISON expr { if ($3 != 4) yyerror("bad set to @%s", $2);
+        debug("SET %s", $2);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        free($2);
+        i->token1 = USERVAR;
+        i->token2 = $1;
+
         Item *c = calloc(1, sizeof(*c));
         c->token1 = COMPARISON;
-        c->token2 = $2;
+        c->token2 = $3;
         c->left = i;
-        c->right = $3;
+        c->right = $4;
 
-        listAddNodeTail(curStmt->setList, c); 
+        $$ = c;
+    } | show_opt USERVAR ASSIGN expr {
+        debug("SET %s", $2);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        free($2);
+        i->token1 = USERVAR;
+        i->token2 = $1;
+
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = ASSIGN;
+        c->left = i;
+        c->right = $4;
+
+        $$ = c;
+    } | show_opt NAME COMPARISON expr { debug ("SET %s", $2);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        free($2);
+        i->token1 = NAME;
+        i->token2 = $1;
+
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
+        c->token2 = $3;
+        c->left = i;
+        c->right = $4;
+
+        $$ = c;
+    } | show_opt NAME COMPARISON set_misc_key_opt {
+        debug ("SET %s=binary", $1);
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        free($2);
+        i->token1 = NAME;
+        i->token2 = $1;
+
+        Item *c = calloc(1, sizeof(*c));
+        c->token1 = COMPARISON;
+        c->token2 = $3;
+        c->left = i;
+
+        Item *r = calloc(1, sizeof(*r));
+        r->token1 = NAME;
+        r->name = strdup($4);
+
+        c->right = r;
+
+        $$ = c;
     }
     ;
+    /* x=y y possible keywords */
+set_misc_key_opt:
+    BINARY { $$="binary";}
+    | DEFAULT { $$ = "default";}
+    | NULLX { $$ = "null"; }
 
     /* -EXPR */
 
@@ -1702,6 +2034,7 @@ expr: expr BETWEEN expr AND expr %prec BETWEEN { debug("BETWEEN");
     /* (a, b, c)
         list(a, b,c)
     */    
+
 val_list: expr {
         debug("val_list:expr1 %p %s %d %s", $1, $1->name, $1->token1);
         list *val_list = listCreate();
@@ -1779,306 +2112,352 @@ expr: NAME '(' opt_val_list ')' {
 
   /* functions with special syntax */
 
-expr: FABS '(' expr ')' { NORMAL_FUNCTION(FABS); }
-    | FACOS '(' expr ')' { NORMAL_FUNCTION(FACOS); }
-    | FADDTIME '(' expr ')' { NORMAL_FUNCTION(FADDTIME); }
-    | FAES_DECRYPT '(' expr ')' { NORMAL_FUNCTION(FAES_DECRYPT); }
-    | FAES_ENCRYPT '(' expr ')' { NORMAL_FUNCTION(FAES_ENCRYPT); }
-    | FAREA '(' expr ')' { NORMAL_FUNCTION(FAREA); }
-    | FASBINARY '(' expr ')' { NORMAL_FUNCTION(FASBINARY); }
-    | FASIN '(' expr ')' { NORMAL_FUNCTION(FASIN); }
-    | FASTEXT '(' expr ')' { NORMAL_FUNCTION(FASTEXT); }
-    | FASWKB '(' expr ')' { NORMAL_FUNCTION(FASWKB); }
-    | FASWKT '(' expr ')' { NORMAL_FUNCTION(FASWKT); }
-    | FATAN '(' expr ')' { NORMAL_FUNCTION(FATAN); }
-    | FATAN2 '(' expr ')' { NORMAL_FUNCTION(FATAN2); }
-    | FASCII '(' expr ')' { NORMAL_FUNCTION(FASCII); }
-    | FAVG '(' expr ')' { NORMAL_FUNCTION(FAVG); }
-    | FADDDATE '(' expr ')' { NORMAL_FUNCTION(FADDDATE); }
-    | FBENCHMARK '(' expr ')' { NORMAL_FUNCTION(FBENCHMARK); }
-    | FBIN '(' expr ')' { NORMAL_FUNCTION(FBIN); }
-    | FBIT_AND '(' expr ')' { NORMAL_FUNCTION(FBIT_AND); }
-    | FBIT_OR '(' expr ')' { NORMAL_FUNCTION(FBIT_OR); }
-    | FBIT_XOR '(' expr ')' { NORMAL_FUNCTION(FBIT_XOR); }
-    | FBIT_COUNT '(' expr ')' { NORMAL_FUNCTION(FBIT_COUNT); }
-    | FBIT_LENGTH '(' expr ')' { NORMAL_FUNCTION(FBIT_LENGTH); }
-    | FCAST '(' expr ')' { NORMAL_FUNCTION(FCAST); }
-    | FCEILING '(' expr ')' { NORMAL_FUNCTION(FCEILING); }
-    | FCENTROID '(' expr ')' { NORMAL_FUNCTION(FCENTROID); }
-    | FCHAR '(' expr ')' { NORMAL_FUNCTION(FCHAR); }
-    | FCHARACTER_LENGTH '(' expr ')' { NORMAL_FUNCTION(FCHARACTER_LENGTH); }
-    | FCOERCIBILITY '(' expr ')' { NORMAL_FUNCTION(FCOERCIBILITY); }
-    | FCOMPRESS '(' expr ')' { NORMAL_FUNCTION(FCOMPRESS); }
-    /* | FCONCAT '(' expr ')' { NORMAL_FUNCTION(FCONCAT); } */
-    | FCONCAT_WS '(' expr ')' { NORMAL_FUNCTION(FCONCAT_WS); }
-    | FCONNECTION_ID '(' expr ')' { NORMAL_FUNCTION(FCONNECTION_ID); }
-    | FCONV '(' expr ')' { NORMAL_FUNCTION(FCONV); }
-    | FCONVERT_TZ '(' expr ')' { NORMAL_FUNCTION(FCONVERT_TZ); }
-    | FCOS '(' expr ')' { NORMAL_FUNCTION(FCOS); }
-    | FCOT '(' expr ')' { NORMAL_FUNCTION(FCOT); }
-    | FCRC32 '(' expr ')' { NORMAL_FUNCTION(FCRC32); }
-    | FCROSSESS '(' expr ')' { NORMAL_FUNCTION(FCROSSESS); }
-    | FCOUNT '(' expr ')' { NORMAL_FUNCTION(FCOUNT); }
+expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
+    | FACOS '(' val_list ')' { NORMAL_FUNCTION(FACOS); }
+    /*| FADDTIME '(' val_list ')' { NORMAL_FUNCTION(FADDTIME); }*/
+    | FADDTIME '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FADDTIME); }
+    /*| FAES_DECRYPT '(' val_list ')' { NORMAL_FUNCTION(FAES_DECRYPT); }*/
+    | FAES_DECRYPT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FAES_DECRYPT); }
+    /*| FAES_ENCRYPT '(' val_list ')' { NORMAL_FUNCTION(FAES_ENCRYPT); }*/
+    | FAES_ENCRYPT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FAES_ENCRYPT); }
+    | FAREA '(' val_list ')' { NORMAL_FUNCTION(FAREA); }
+    | FASBINARY '(' val_list ')' { NORMAL_FUNCTION(FASBINARY); }
+    | FASIN '(' val_list ')' { NORMAL_FUNCTION(FASIN); }
+    | FASTEXT '(' val_list ')' { NORMAL_FUNCTION(FASTEXT); }
+    | FASWKB '(' val_list ')' { NORMAL_FUNCTION(FASWKB); }
+    | FASWKT '(' val_list ')' { NORMAL_FUNCTION(FASWKT); }
+    | FATAN '(' val_list ')' { NORMAL_FUNCTION(FATAN); }
+    | FATAN2 '(' val_list ')' { NORMAL_FUNCTION(FATAN2); }
+    | FASCII '(' val_list ')' { NORMAL_FUNCTION(FASCII); }
+    /* TODO avg(distinct expr) */
+    | FAVG '(' val_list ')' { NORMAL_FUNCTION(FAVG); }
+    /*| FADDDATE '(' val_list ')' { NORMAL_FUNCTION(FADDDATE); }*/
+    | FADDDATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FADDDATE); }
+    /*| FBENCHMARK '(' val_list ')' { NORMAL_FUNCTION(FBENCHMARK); }*/
+    | FBENCHMARK '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FBENCHMARK); }
+    | FBIN '(' val_list ')' { NORMAL_FUNCTION(FBIN); }
+    | FBIT_AND '(' val_list ')' { NORMAL_FUNCTION(FBIT_AND); }
+    | FBIT_OR '(' val_list ')' { NORMAL_FUNCTION(FBIT_OR); }
+    | FBIT_XOR '(' val_list ')' { NORMAL_FUNCTION(FBIT_XOR); }
+    | FBIT_COUNT '(' val_list ')' { NORMAL_FUNCTION(FBIT_COUNT); }
+    | FBIT_LENGTH '(' val_list ')' { NORMAL_FUNCTION(FBIT_LENGTH); }
+    /*| FCAST '(' val_list ')' { NORMAL_FUNCTION(FCAST); }*/
+    | FCAST '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCAST); }
+    | FCEILING '(' val_list ')' { NORMAL_FUNCTION(FCEILING); }
+    | FCENTROID '(' val_list ')' { NORMAL_FUNCTION(FCENTROID); }
+    /*| FCHAR '(' val_list ')' { NORMAL_FUNCTION(FCHAR); } */
+    | FCHAR '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCHAR); }
+    | FCHARACTER_LENGTH '(' val_list ')' { NORMAL_FUNCTION(FCHARACTER_LENGTH); }
+    | FCOERCIBILITY '(' val_list ')' { NORMAL_FUNCTION(FCOERCIBILITY); }
+    | FCOMPRESS '(' val_list ')' { NORMAL_FUNCTION(FCOMPRESS); }
+    /* | FCONCAT '(' val_list ')' { NORMAL_FUNCTION(FCONCAT); } */
+    | FCONCAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCONCAT); }
+    | FCONCAT_WS '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCONCAT_WS); }
+    | FCONNECTION_ID '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCONNECTION_ID); }
+    /*| FCONV '(' val_list ')' { NORMAL_FUNCTION(FCONV); }*/
+    | FCONV '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCONV); }
+    /*| FCONVERT_TZ '(' val_list ')' { NORMAL_FUNCTION(FCONVERT_TZ); }*/
+    | FCONVERT_TZ '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FCONVERT_TZ); }
+    | FCOS '(' val_list ')' { NORMAL_FUNCTION(FCOS); }
+    | FCOT '(' val_list ')' { NORMAL_FUNCTION(FCOT); }
+    | FCRC32 '(' val_list ')' { NORMAL_FUNCTION(FCRC32); }
+    | FCROSSESS '(' val_list ')' { NORMAL_FUNCTION(FCROSSESS); }
+    /* TODO count(distinct expr, expr)*/
+    /* TODO count(distinct) */
+    | FCOUNT '(' val_list ')' { NORMAL_FUNCTION(FCOUNT); }
     | FCOUNT '(' '*' ')' { NORMAL_FUNCTION_WILD(FCOUNT); }
-    | FCHARSET '(' expr ')' { NORMAL_FUNCTION(FCHARSET); }
-    | FCOLLATION '(' expr ')' { NORMAL_FUNCTION(FCOLLATION); }
-    | FCURRENT_USER '(' expr ')' { NORMAL_FUNCTION(FCURRENT_USER); }
+    | FCHARSET '(' val_list ')' { NORMAL_FUNCTION(FCHARSET); }
+    | FCOLLATION '(' val_list ')' { NORMAL_FUNCTION(FCOLLATION); }
+    | FCURRENT_USER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURRENT_USER); }
     | FCURDATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURDATE); }
-    | FCURRENT_DATE '(' expr ')' { NORMAL_FUNCTION(FCURRENT_DATE); }
+    | FCURRENT_DATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURRENT_DATE); }
+    | FCURRENT_TIMESTAMP '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURRENT_TIMESTAMP); }
     | FCURTIME '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURTIME); }
-    | FCURTIME_TIME '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIME); }
-    | FCURTIME_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FCURTIME_TIMESTAMP); }
-    | FDATE '(' expr ')' { NORMAL_FUNCTION(FDATE); }
-    | FDATEDIFF '(' expr ')' { NORMAL_FUNCTION(FDATEDIFF); }
-    | FDATENAME '(' expr ')' { NORMAL_FUNCTION(FDATENAME); }
-    | FDATEOFMONTH '(' expr ')' { NORMAL_FUNCTION(FDATEOFMONTH); }
-    | FDATEOFWEEK '(' expr ')' { NORMAL_FUNCTION(FDATEOFWEEK); }
-    | FDATEOFYEAR '(' expr ')' { NORMAL_FUNCTION(FDATEOFYEAR); }
-    | FDATE_ADD '(' expr ')' { NORMAL_FUNCTION(FDATE_ADD); }
-    | FDATE_SUB '(' expr ')' { NORMAL_FUNCTION(FDATE_SUB); }
-    | FDATE_FORMAT '(' expr ')' { NORMAL_FUNCTION(FDATE_FORMAT); }
-    | FDATABASE '(' expr ')' { NORMAL_FUNCTION(FDATABASE); }
-    | FDEFAULT '(' expr ')' { NORMAL_FUNCTION(FDEFAULT); }
-    | FDECODE '(' expr ')' { NORMAL_FUNCTION(FDECODE); }
-    | FDEGREES '(' expr ')' { NORMAL_FUNCTION(FDEGREES); }
-    | FDES_DECRYPT '(' expr ')' { NORMAL_FUNCTION(FDES_DECRYPT); }
-    | FDES_ENCRYPT '(' expr ')' { NORMAL_FUNCTION(FDES_ENCRYPT); }
-    | FDIMENSION '(' expr ')' { NORMAL_FUNCTION(FDIMENSION); }
-    | FISJOINT '(' expr ')' { NORMAL_FUNCTION(FISJOINT); }
-    | FELT '(' expr ')' { NORMAL_FUNCTION(FELT); }
-    | FENCODE '(' expr ')' { NORMAL_FUNCTION(FENCODE); }
-    | FENCRYPT '(' expr ')' { NORMAL_FUNCTION(FENCRYPT); }
-    | FENDPOINT '(' expr ')' { NORMAL_FUNCTION(FENDPOINT); }
-    | FENVELOPE '(' expr ')' { NORMAL_FUNCTION(FENVELOPE); }
-    | FEQUALS '(' expr ')' { NORMAL_FUNCTION(FEQUALS); }
-    | FEXP '(' expr ')' { NORMAL_FUNCTION(FEXP); }
-    | FEXPORT_SET '(' expr ')' { NORMAL_FUNCTION(FEXPORT_SET); }
-    | FEXTERIORRING '(' expr ')' { NORMAL_FUNCTION(FEXTERIORRING); }
-    | FEXTRACTVALUE '(' expr ')' { NORMAL_FUNCTION(FEXTRACTVALUE); }
-    | FFIELD '(' expr ')' { NORMAL_FUNCTION(FFIELD); }
-    | FFIND_IN_SET '(' expr ')' { NORMAL_FUNCTION(FFIND_IN_SET); }
-    | FFLOOR '(' expr ')' { NORMAL_FUNCTION(FFLOOR); }
-    | FFORMAT '(' expr ')' { NORMAL_FUNCTION(FFORMAT); }
-    | FFOUND_ROWS '(' expr ')' { NORMAL_FUNCTION(FFOUND_ROWS); }
-    | FFROM_DAYS '(' expr ')' { NORMAL_FUNCTION(FFROM_DAYS); }
-    | FFROM_UNIXTIME '(' expr ')' { NORMAL_FUNCTION(FFROM_UNIXTIME); }
-    | FGET_FORMAT '(' expr ')' { NORMAL_FUNCTION(FGET_FORMAT); }
-    | FGEOMCOLLFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMCOLLFROMTEXT); }
-    | FGEOMCOLLFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMCOLLFROMWKB); }
-    | FGEOMETRYCOLLECTIONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMTEXT); }
-    | FGEOMETRYCOLLECTIONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMWKB); }
-    | FGEOMETRYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYFROMTEXT); }
-    | FGEOMETRYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYFROMWKB); }
-    | FGEOMETRYN '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYN); }
-    | FGEOMETRYTYPE '(' expr ')' { NORMAL_FUNCTION(FGEOMETRYTYPE); }
-    | FGEOMFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FGEOMFROMTEXT); }
-    | FGEOMFROMWKB '(' expr ')' { NORMAL_FUNCTION(FGEOMFROMWKB); }
-    | FGET_LOCK '(' expr ')' { NORMAL_FUNCTION(FGET_LOCK); }
-    | FGLENGTH '(' expr ')' { NORMAL_FUNCTION(FGLENGTH); }
-    | FGREATEST '(' expr ')' { NORMAL_FUNCTION(FGREATEST); }
-    | FHEX '(' expr ')' { NORMAL_FUNCTION(FHEX); }
-    | FHOUR '(' expr ')' { NORMAL_FUNCTION(FHOUR); }
-    | FINSERT '(' expr ')' { NORMAL_FUNCTION(FINSERT); }
-    | FINSTR '(' expr ')' { NORMAL_FUNCTION(FINSTR); }
-    /* | FIFNULL '(' expr ')' { NORMAL_FUNCTION(FIFNULL); } */
-    | FINET_ATON '(' expr ')' { NORMAL_FUNCTION(FINET_ATON); }
-    | FINET_NTOA '(' expr ')' { NORMAL_FUNCTION(FINET_NTOA); }
-    | FINTERIORRINGN '(' expr ')' { NORMAL_FUNCTION(FINTERIORRINGN); }
-    | FINTERSECTS '(' expr ')' { NORMAL_FUNCTION(FINTERSECTS); }
-    | FISCLOSED '(' expr ')' { NORMAL_FUNCTION(FISCLOSED); }
-    | FISEMPTY '(' expr ')' { NORMAL_FUNCTION(FISEMPTY); }
-    | FISNULL '(' expr ')' { NORMAL_FUNCTION(FISNULL); }
-    | FISSIMPLE '(' expr ')' { NORMAL_FUNCTION(FISSIMPLE); }
-    | FIS_FREE_LOCK '(' expr ')' { NORMAL_FUNCTION(FIS_FREE_LOCK); }
-    | FIS_USED_LOCK '(' expr ')' { NORMAL_FUNCTION(FIS_USED_LOCK); }
-    | FLAST_DAY '(' expr ')' { NORMAL_FUNCTION(FLAST_DAY); }
-    | FLAST_INSERT_ID '(' expr ')' { NORMAL_FUNCTION(FLAST_INSERT_ID); }
-    | FLCASE '(' expr ')' { NORMAL_FUNCTION(FLCASE); }
-    | FLEFT '(' expr ')' { NORMAL_FUNCTION(FLEFT); }
-    | FLENGTH '(' expr ')' { NORMAL_FUNCTION(FLENGTH); }
-    | FLINEFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FLINEFROMTEXT); }
-    | FLINEFROMWKB '(' expr ')' { NORMAL_FUNCTION(FLINEFROMWKB); }
-    | FLINESTRINGFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FLINESTRINGFROMTEXT); }
-    | FLINESTRINGFROMWKB '(' expr ')' { NORMAL_FUNCTION(FLINESTRINGFROMWKB); }
-    | FLN '(' expr ')' { NORMAL_FUNCTION(FLN); }
-    | FLOAD_FILE '(' expr ')' { NORMAL_FUNCTION(FLOAD_FILE); }
-    | FLOCATE '(' expr ')' { NORMAL_FUNCTION(FLOCATE); }
-    | FLOG '(' expr ')' { NORMAL_FUNCTION(FLOG); }
-    | FLOG10 '(' expr ')' { NORMAL_FUNCTION(FLOG10); }
-    | FLOG2 '(' expr ')' { NORMAL_FUNCTION(FLOG2); }
-    | FLOWER '(' expr ')' { NORMAL_FUNCTION(FLOWER); }
-    | FLPAD '(' expr ')' { NORMAL_FUNCTION(FLPAD); }
-    | FLTRIM '(' expr ')' { NORMAL_FUNCTION(FLTRIM); }
-    | FLOCALTIME '(' expr ')' { NORMAL_FUNCTION(FLOCALTIME); }
-    | FLOCALTIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FLOCALTIMESTAMP); }
-    | FMAKEDATE '(' expr ')' { NORMAL_FUNCTION(FMAKEDATE); }
-    | FMAKETIME '(' expr ')' { NORMAL_FUNCTION(FMAKETIME); }
-    | FMAKE_SET '(' expr ')' { NORMAL_FUNCTION(FMAKE_SET); }
-    | FMASTER_POS_WAIT '(' expr ')' { NORMAL_FUNCTION(FMASTER_POS_WAIT); }
-    | FMBRCONTAINS '(' expr ')' { NORMAL_FUNCTION(FMBRCONTAINS); }
-    | FMBRDISJOINT '(' expr ')' { NORMAL_FUNCTION(FMBRDISJOINT); }
-    | FMBREQUAL '(' expr ')' { NORMAL_FUNCTION(FMBREQUAL); }
-    | FMBRINTERSECTS '(' expr ')' { NORMAL_FUNCTION(FMBRINTERSECTS); }
-    | FMBROVERLAPS '(' expr ')' { NORMAL_FUNCTION(FMBROVERLAPS); }
-    | FMBRTOUCHES '(' expr ')' { NORMAL_FUNCTION(FMBRTOUCHES); }
-    | FMBRWITHIN '(' expr ')' { NORMAL_FUNCTION(FMBRWITHIN); }
-    | FMD5 '(' expr ')' { NORMAL_FUNCTION(FMD5); }
-    | FMLINEFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMLINEFROMTEXT); }
-    | FMLINEFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMLINEFROMWKB); }
-    | FMONTHNAME '(' expr ')' { NORMAL_FUNCTION(FMONTHNAME); }
-    | FMPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMPOINTFROMTEXT); }
-    | FMPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMPOINTFROMWKB); }
-    | FMPOLYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMPOLYFROMTEXT); }
-    | FMPOLYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMPOLYFROMWKB); }
-    | FMULTILINESTRINGFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMTEXT); }
-    | FMULTILINESTRINGFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMWKB); }
-    | FMULTIPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTIPOINTFROMTEXT); }
-    | FMULTIPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTIPOINTFROMWKB); }
-    | FMULTIPOLYGONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMTEXT); }
-    | FMULTIPOLYGONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMWKB); }
-    | FMICROSECOND '(' expr ')' { NORMAL_FUNCTION(FMICROSECOND); }
-    | FMINUTE '(' expr ')' { NORMAL_FUNCTION(FMINUTE); }
-    | FMONTH '(' expr ')' { NORMAL_FUNCTION(FMONTH); }
-    | FGROUP_CONCAT '(' expr ')' { NORMAL_FUNCTION(FGROUP_CONCAT); }
-    | FMAX '(' expr ')' { NORMAL_FUNCTION(FMAX); }
-    | FMID '(' expr ')' { NORMAL_FUNCTION(FMID); }
-    | FMIN '(' expr ')' { NORMAL_FUNCTION(FMIN); }
-    | FMOD '(' expr ')' { NORMAL_FUNCTION(FMOD); }
-    | FNOW '(' expr ')' { NORMAL_FUNCTION(FNOW); }
-    | FNAME_CONST '(' expr ')' { NORMAL_FUNCTION(FNAME_CONST); }
-    | FNULLIF '(' expr ')' { NORMAL_FUNCTION(FNULLIF); }
-    | FNUMGEOMETRIES '(' expr ')' { NORMAL_FUNCTION(FNUMGEOMETRIES); }
-    | FNUMINTERIORRINGS '(' expr ')' { NORMAL_FUNCTION(FNUMINTERIORRINGS); }
-    | FNUMPOINTS '(' expr ')' { NORMAL_FUNCTION(FNUMPOINTS); }
-    | FOCT '(' expr ')' { NORMAL_FUNCTION(FOCT); }
-    | FOCTET_LENGTH '(' expr ')' { NORMAL_FUNCTION(FOCTET_LENGTH); }
-    | FORD '(' expr ')' { NORMAL_FUNCTION(FORD); }
-    | FOVERLAPS '(' expr ')' { NORMAL_FUNCTION(FOVERLAPS); }
-    | FOLD_PASSWORD '(' expr ')' { NORMAL_FUNCTION(FOLD_PASSWORD); }
-    | FPERIOD_ADD '(' expr ')' { NORMAL_FUNCTION(FPERIOD_ADD); }
-    | FPERIOD_DIFF '(' expr ')' { NORMAL_FUNCTION(FPERIOD_DIFF); }
-    | FPI '(' expr ')' { NORMAL_FUNCTION(FPI); }
-    | FPOSITION '(' expr ')' { NORMAL_FUNCTION(FPOSITION); }
-    | FPASSWORD '(' expr ')' { NORMAL_FUNCTION(FPASSWORD); }
-    | FPOINTFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOINTFROMTEXT); }
-    | FPOINTFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOINTFROMWKB); }
-    | FPOINTN '(' expr ')' { NORMAL_FUNCTION(FPOINTN); }
-    | FPOLYFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOLYFROMTEXT); }
-    | FPOLYFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOLYFROMWKB); }
-    | FPOLYGONFROMTEXT '(' expr ')' { NORMAL_FUNCTION(FPOLYGONFROMTEXT); }
-    | FPOLYGONFROMWKB '(' expr ')' { NORMAL_FUNCTION(FPOLYGONFROMWKB); }
-    | FPOW '(' expr ')' { NORMAL_FUNCTION(FPOW); }
-    | FPOWER '(' expr ')' { NORMAL_FUNCTION(FPOWER); }
-    | FQUARTER '(' expr ')' { NORMAL_FUNCTION(FQUARTER); }
-    | FQUOTE '(' expr ')' { NORMAL_FUNCTION(FQUOTE); }
-    | FRADIANS '(' expr ')' { NORMAL_FUNCTION(FRADIANS); }
-    | FRAND '(' expr ')' { NORMAL_FUNCTION(FRAND); }
-    | FROUND '(' expr ')' { NORMAL_FUNCTION(FROUND); }
-    | FROW_COUNT '(' expr ')' { NORMAL_FUNCTION(FROW_COUNT); }
-    | FREPEAT '(' expr ')' { NORMAL_FUNCTION(FREPEAT); }
-    | FREPLACE '(' expr ')' { NORMAL_FUNCTION(FREPLACE); }
-    | FREVERSE '(' expr ')' { NORMAL_FUNCTION(FREVERSE); }
-    | FRIGHT '(' expr ')' { NORMAL_FUNCTION(FRIGHT); }
-    | FRPAD '(' expr ')' { NORMAL_FUNCTION(FRPAD); }
-    | FRTRIM '(' expr ')' { NORMAL_FUNCTION(FRTRIM); }
-    | FRELEASE_LOCK '(' expr ')' { NORMAL_FUNCTION(FRELEASE_LOCK); }
-    | FSEC_TO_TIME '(' expr ')' { NORMAL_FUNCTION(FSEC_TO_TIME); }
-    | FSEC_TO_DATE '(' expr ')' { NORMAL_FUNCTION(FSEC_TO_DATE); }
-    | FSHA '(' expr ')' { NORMAL_FUNCTION(FSHA); }
-    | FSHA1 '(' expr ')' { NORMAL_FUNCTION(FSHA1); }
-    | FSIGN '(' expr ')' { NORMAL_FUNCTION(FSIGN); }
-    | FSIN '(' expr ')' { NORMAL_FUNCTION(FSIN); }
-    | FSLEEP '(' expr ')' { NORMAL_FUNCTION(FSLEEP); }
-    | FSCHEMA '(' expr ')' { NORMAL_FUNCTION(FSCHEMA); }
-    | FSOUNDEX '(' expr ')' { NORMAL_FUNCTION(FSOUNDEX); }
-    | FSPACE '(' expr ')' { NORMAL_FUNCTION(FSPACE); }
-    | FSQRT '(' expr ')' { NORMAL_FUNCTION(FSQRT); }
-    | FSRID '(' expr ')' { NORMAL_FUNCTION(FSRID); }
-    | FSTARTPOINT '(' expr ')' { NORMAL_FUNCTION(FSTARTPOINT); }
-    | FSTRCMP '(' expr ')' { NORMAL_FUNCTION(FSTRCMP); }
-    | FSTR_TO_DATE '(' expr ')' { NORMAL_FUNCTION(FSTR_TO_DATE); }
-    | FSECOND '(' expr ')' { NORMAL_FUNCTION(FSECOND); }
-    | FSUBTIME '(' expr ')' { NORMAL_FUNCTION(FSUBTIME); }
-    /*| FSUBSTRING '(' expr ')' { NORMAL_FUNCTION(FSUBSTRING); } */
-    | FSUBSTRING_INDEX '(' expr ')' { NORMAL_FUNCTION(FSUBSTRING_INDEX); }
-    | FSESSION_USER '(' expr ')' { NORMAL_FUNCTION(FSESSION_USER); }
-    | FSTD '(' expr ')' { NORMAL_FUNCTION(FSTD); }
-    | FSTDDEV '(' expr ')' { NORMAL_FUNCTION(FSTDDEV); }
-    | FSTDDEV_POP '(' expr ')' { NORMAL_FUNCTION(FSTDDEV_POP); }
-    | FSTDDEV_SAMP '(' expr ')' { NORMAL_FUNCTION(FSTDDEV_SAMP); }
-    | FSUBDATE '(' expr ')' { NORMAL_FUNCTION(FSUBDATE); }
-    | FSUM '(' expr ')' { NORMAL_FUNCTION(FSUM); }
+    | FCURTIME_TIME '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURTIME_TIME); }
+    | FDATE '(' val_list ')' { NORMAL_FUNCTION(FDATE); }
+    /*| FDATEDIFF '(' val_list ')' { NORMAL_FUNCTION(FDATEDIFF); }*/
+    | FDATEDIFF '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATEDIFF); }
+    | FDATENAME '(' val_list ')' { NORMAL_FUNCTION(FDATENAME); }
+    | FDATEOFMONTH '(' val_list ')' { NORMAL_FUNCTION(FDATEOFMONTH); }
+    | FDATEOFWEEK '(' val_list ')' { NORMAL_FUNCTION(FDATEOFWEEK); }
+    | FDATEOFYEAR '(' val_list ')' { NORMAL_FUNCTION(FDATEOFYEAR); }
+    /*| FDATE_ADD '(' val_list ')' { NORMAL_FUNCTION(FDATE_ADD); }*/
+    | FDATE_ADD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_ADD); }
+    /*| FDATE_SUB '(' val_list ')' { NORMAL_FUNCTION(FDATE_SUB); }*/
+    | FDATE_SUB '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_SUB); }
+    /*| FDATE_FORMAT '(' val_list ')' { NORMAL_FUNCTION(FDATE_FORMAT); }*/
+    | FDATE_FORMAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_FORMAT); }
+    | FDATABASE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FDATABASE); }
+    | FDAY '(' val_list ')' { NORMAL_FUNCTION(FDAY); }
+    | FDAYNAME '(' val_list ')' { NORMAL_FUNCTION(FDAYNAME); }
+    | FDAYOFMONTH '(' val_list ')' { NORMAL_FUNCTION(FDAYOFMONTH); }
+    | FDAYOFWEEK '(' val_list ')' { NORMAL_FUNCTION(FDAYOFWEEK); }
+    | FDAYOFYEAR '(' val_list ')' { NORMAL_FUNCTION(FDAYOFYEAR); }
+    | FDEFAULT '(' val_list ')' { NORMAL_FUNCTION(FDEFAULT); }
+    | FDECODE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDECODE); }
+    | FDEGREES '(' val_list ')' { NORMAL_FUNCTION(FDEGREES); }
+    /*| FDES_DECRYPT '(' val_list ')' { NORMAL_FUNCTION(FDES_DECRYPT); }*/
+    | FDES_DECRYPT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDES_DECRYPT); }
+    /*| FDES_ENCRYPT '(' val_list ')' { NORMAL_FUNCTION(FDES_ENCRYPT); }*/
+    | FDES_ENCRYPT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDES_ENCRYPT); }
+    | FDIMENSION '(' val_list ')' { NORMAL_FUNCTION(FDIMENSION); }
+    | FISJOINT '(' val_list ')' { NORMAL_FUNCTION(FISJOINT); }
+    /*| FELT '(' val_list ')' { NORMAL_FUNCTION(FELT); } */
+    | FELT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FELT); }
+    /*| FENCODE '(' val_list ')' { NORMAL_FUNCTION(FENCODE); }*/
+    | FENCODE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FENCODE); }
+    | FENCRYPT '(' val_list ')' { NORMAL_FUNCTION(FENCRYPT); }
+    | FENDPOINT '(' val_list ')' { NORMAL_FUNCTION(FENDPOINT); }
+    | FENVELOPE '(' val_list ')' { NORMAL_FUNCTION(FENVELOPE); }
+    | FEQUALS '(' val_list ')' { NORMAL_FUNCTION(FEQUALS); }
+    | FEXP '(' val_list ')' { NORMAL_FUNCTION(FEXP); }
+    /*| FEXPORT_SET '(' val_list ')' { NORMAL_FUNCTION(FEXPORT_SET); } */
+    | FEXPORT_SET '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FEXPORT_SET); }
+    | FEXTRACT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FEXTRACT); }
+    | FEXTERIORRING '(' val_list ')' { NORMAL_FUNCTION(FEXTERIORRING); }
+    /*| FEXTRACTVALUE '(' val_list ')' { NORMAL_FUNCTION(FEXTRACTVALUE); }*/
+    | FEXTRACTVALUE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FEXTRACTVALUE); }
+    /*| FFIELD '(' val_list ')' { NORMAL_FUNCTION(FFIELD); }*/
+    | FFIELD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FFIELD); }
+    /*| FFIND_IN_SET '(' val_list ')' { NORMAL_FUNCTION(FFIND_IN_SET); }*/
+    | FFIND_IN_SET '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FFIND_IN_SET); }
+    | FFLOOR '(' val_list ')' { NORMAL_FUNCTION(FFLOOR); }
+    /*| FFORMAT '(' val_list ')' { NORMAL_FUNCTION(FFORMAT); } */
+    | FFORMAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FFORMAT); }
+    | FFOUND_ROWS '(' ')' { NORMAL_FUNCTION_NO_PARAM(FFOUND_ROWS); }
+    | FFROM_DAYS '(' val_list ')' { NORMAL_FUNCTION(FFROM_DAYS); }
+    | FFROM_UNIXTIME '(' val_list ')' { NORMAL_FUNCTION(FFROM_UNIXTIME); }
+    /*| FGET_FORMAT '(' val_list ')' { NORMAL_FUNCTION(FGET_FORMAT); } */
+    | FGET_FORMAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FGET_FORMAT); }
+    | FGEOMCOLLFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FGEOMCOLLFROMTEXT); }
+    | FGEOMCOLLFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FGEOMCOLLFROMWKB); }
+    | FGEOMETRYCOLLECTIONFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMTEXT); }
+    | FGEOMETRYCOLLECTIONFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYCOLLECTIONFROMWKB); }
+    | FGEOMETRYFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYFROMTEXT); }
+    | FGEOMETRYFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYFROMWKB); }
+    | FGEOMETRYN '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYN); }
+    | FGEOMETRYTYPE '(' val_list ')' { NORMAL_FUNCTION(FGEOMETRYTYPE); }
+    | FGEOMFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FGEOMFROMTEXT); }
+    | FGEOMFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FGEOMFROMWKB); }
+    /* | FGET_LOCK '(' val_list ')' { NORMAL_FUNCTION(FGET_LOCK); }*/
+    | FGET_LOCK '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FGET_LOCK); }
+    | FGLENGTH '(' val_list ')' { NORMAL_FUNCTION(FGLENGTH); }
+    | FGREATEST '(' val_list ')' { NORMAL_FUNCTION(FGREATEST); }
+    | FHEX '(' val_list ')' { NORMAL_FUNCTION(FHEX); }
+    | FHOUR '(' val_list ')' { NORMAL_FUNCTION(FHOUR); }
+    /*| FINSERT '(' val_list ')' { NORMAL_FUNCTION(FINSERT); } */
+    | FINSERT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FINSERT); }
+    /*| FINSTR '(' val_list ')' { NORMAL_FUNCTION(FINSTR); } */
+    | FINSTR '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FINSTR); }
+    /* | FIFNULL '(' val_list ')' { NORMAL_FUNCTION(FIFNULL); } */
+    | FIFNULL '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FIFNULL); } 
+    | FIF '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FIF); } 
+    | FINET_ATON '(' val_list ')' { NORMAL_FUNCTION(FINET_ATON); }
+    | FINET_NTOA '(' val_list ')' { NORMAL_FUNCTION(FINET_NTOA); }
+    | FINTERIORRINGN '(' val_list ')' { NORMAL_FUNCTION(FINTERIORRINGN); }
+    | FINTERSECTS '(' val_list ')' { NORMAL_FUNCTION(FINTERSECTS); }
+    | FISCLOSED '(' val_list ')' { NORMAL_FUNCTION(FISCLOSED); }
+    | FISEMPTY '(' val_list ')' { NORMAL_FUNCTION(FISEMPTY); }
+    | FISNULL '(' val_list ')' { NORMAL_FUNCTION(FISNULL); }
+    | FISSIMPLE '(' val_list ')' { NORMAL_FUNCTION(FISSIMPLE); }
+    | FIS_FREE_LOCK '(' val_list ')' { NORMAL_FUNCTION(FIS_FREE_LOCK); }
+    | FIS_USED_LOCK '(' val_list ')' { NORMAL_FUNCTION(FIS_USED_LOCK); }
+    | FLAST_DAY '(' val_list ')' { NORMAL_FUNCTION(FLAST_DAY); }
+    | FLAST_INSERT_ID '(' ')' { NORMAL_FUNCTION_NO_PARAM(FLAST_INSERT_ID); }
+    | FLAST_INSERT_ID '(' val_list ')' { NORMAL_FUNCTION(FLAST_INSERT_ID); }
+    | FLCASE '(' val_list ')' { NORMAL_FUNCTION(FLCASE); }
+    /*| FLEFT '(' val_list ')' { NORMAL_FUNCTION(FLEFT); } */
+    | FLEFT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FLEFT); }
+    | FLENGTH '(' val_list ')' { NORMAL_FUNCTION(FLENGTH); }
+    | FLINEFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FLINEFROMTEXT); }
+    | FLINEFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FLINEFROMWKB); }
+    | FLINESTRINGFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FLINESTRINGFROMTEXT); }
+    | FLINESTRINGFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FLINESTRINGFROMWKB); }
+    | FLN '(' val_list ')' { NORMAL_FUNCTION(FLN); }
+    | FLOAD_FILE '(' val_list ')' { NORMAL_FUNCTION(FLOAD_FILE); }
+    /*| FLOCATE '(' val_list ')' { NORMAL_FUNCTION(FLOCATE); }*/
+    | FLOCATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FLOCATE); }
+    | FLOG '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FLOG); }
+    | FLOG10 '(' val_list ')' { NORMAL_FUNCTION(FLOG10); }
+    | FLOG2 '(' val_list ')' { NORMAL_FUNCTION(FLOG2); }
+    | FLOWER '(' val_list ')' { NORMAL_FUNCTION(FLOWER); }
+    /* | FLPAD '(' val_list ')' { NORMAL_FUNCTION(FLPAD); } */
+    | FLPAD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FLPAD); }
+    | FLTRIM '(' val_list ')' { NORMAL_FUNCTION(FLTRIM); }
+    | FLOCALTIME '(' ')' { NORMAL_FUNCTION_NO_PARAM(FLOCALTIME); }
+    | FLOCALTIMESTAMP '(' ')' { NORMAL_FUNCTION_NO_PARAM(FLOCALTIMESTAMP); }
+    /*| FMAKEDATE '(' val_list ')' { NORMAL_FUNCTION(FMAKEDATE); }*/
+    | FMAKEDATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FMAKEDATE); }
+    | FMAKETIME '(' val_list ')' { NORMAL_FUNCTION(FMAKETIME); }
+    /*| FMAKE_SET '(' val_list ')' { NORMAL_FUNCTION(FMAKE_SET); }*/
+    | FMAKE_SET '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FMAKE_SET); }
+    /*| FMASTER_POS_WAIT '(' val_list ')' { NORMAL_FUNCTION(FMASTER_POS_WAIT); }*/
+    | FMASTER_POS_WAIT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FMASTER_POS_WAIT); }
+    | FMBRCONTAINS '(' val_list ')' { NORMAL_FUNCTION(FMBRCONTAINS); }
+    | FMBRDISJOINT '(' val_list ')' { NORMAL_FUNCTION(FMBRDISJOINT); }
+    | FMBREQUAL '(' val_list ')' { NORMAL_FUNCTION(FMBREQUAL); }
+    | FMBRINTERSECTS '(' val_list ')' { NORMAL_FUNCTION(FMBRINTERSECTS); }
+    | FMBROVERLAPS '(' val_list ')' { NORMAL_FUNCTION(FMBROVERLAPS); }
+    | FMBRTOUCHES '(' val_list ')' { NORMAL_FUNCTION(FMBRTOUCHES); }
+    | FMBRWITHIN '(' val_list ')' { NORMAL_FUNCTION(FMBRWITHIN); }
+    | FMD5 '(' val_list ')' { NORMAL_FUNCTION(FMD5); }
+    | FMLINEFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMLINEFROMTEXT); }
+    | FMLINEFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMLINEFROMWKB); }
+    | FMONTHNAME '(' val_list ')' { NORMAL_FUNCTION(FMONTHNAME); }
+    | FMPOINTFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMPOINTFROMTEXT); }
+    | FMPOINTFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMPOINTFROMWKB); }
+    | FMPOLYFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMPOLYFROMTEXT); }
+    | FMPOLYFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMPOLYFROMWKB); }
+    | FMULTILINESTRINGFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMTEXT); }
+    | FMULTILINESTRINGFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMULTILINESTRINGFROMWKB); }
+    | FMULTIPOINTFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMULTIPOINTFROMTEXT); }
+    | FMULTIPOINTFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMULTIPOINTFROMWKB); }
+    | FMULTIPOLYGONFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMTEXT); }
+    | FMULTIPOLYGONFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FMULTIPOLYGONFROMWKB); }
+    | FMICROSECOND '(' val_list ')' { NORMAL_FUNCTION(FMICROSECOND); }
+    | FMINUTE '(' val_list ')' { NORMAL_FUNCTION(FMINUTE); }
+    | FMONTH '(' val_list ')' { NORMAL_FUNCTION(FMONTH); }
+    /* GROUP_CONCAT( distinct expr) */
+    | FGROUP_CONCAT '(' val_list ')' { NORMAL_FUNCTION(FGROUP_CONCAT); }
+    | FMAX '(' val_list ')' { NORMAL_FUNCTION(FMAX); }
+    /*| FMID '(' val_list ')' { NORMAL_FUNCTION(FMID); } */
+    | FMID '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FMID); }
+    | FMIN '(' val_list ')' { NORMAL_FUNCTION(FMIN); }
+    /*| FMOD '(' val_list ')' { NORMAL_FUNCTION(FMOD); }*/
+    | FMOD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FMOD); }
+    | FNOW '(' ')' { NORMAL_FUNCTION_NO_PARAM(FNOW); }
+    | FNAME_CONST '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FNAME_CONST); }
+    | FNULLIF '(' val_list ')' { NORMAL_FUNCTION(FNULLIF); }
+    | FNUMGEOMETRIES '(' val_list ')' { NORMAL_FUNCTION(FNUMGEOMETRIES); }
+    | FNUMINTERIORRINGS '(' val_list ')' { NORMAL_FUNCTION(FNUMINTERIORRINGS); }
+    | FNUMPOINTS '(' val_list ')' { NORMAL_FUNCTION(FNUMPOINTS); }
+    | FOCT '(' val_list ')' { NORMAL_FUNCTION(FOCT); }
+    | FOCTET_LENGTH '(' val_list ')' { NORMAL_FUNCTION(FOCTET_LENGTH); }
+    | FORD '(' val_list ')' { NORMAL_FUNCTION(FORD); }
+    | FOVERLAPS '(' val_list ')' { NORMAL_FUNCTION(FOVERLAPS); }
+    | FOLD_PASSWORD '(' val_list ')' { NORMAL_FUNCTION(FOLD_PASSWORD); }
+    /*| FPERIOD_ADD '(' val_list ')' { NORMAL_FUNCTION(FPERIOD_ADD); }*/
+    | FPERIOD_ADD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FPERIOD_ADD); }
+    /*| FPERIOD_DIFF '(' val_list ')' { NORMAL_FUNCTION(FPERIOD_DIFF); }*/
+    | FPERIOD_DIFF '(' val_list ')' { NORMAL_FUNCTION(FPERIOD_DIFF); }
+    | FPI '(' ')' { NORMAL_FUNCTION_NO_PARAM(FPI); }
+    | FPASSWORD '(' val_list ')' { NORMAL_FUNCTION(FPASSWORD); }
+    | FPOINTFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FPOINTFROMTEXT); }
+    | FPOINTFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FPOINTFROMWKB); }
+    | FPOINTN '(' val_list ')' { NORMAL_FUNCTION(FPOINTN); }
+    | FPOLYFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FPOLYFROMTEXT); }
+    | FPOLYFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FPOLYFROMWKB); }
+    | FPOLYGONFROMTEXT '(' val_list ')' { NORMAL_FUNCTION(FPOLYGONFROMTEXT); }
+    | FPOLYGONFROMWKB '(' val_list ')' { NORMAL_FUNCTION(FPOLYGONFROMWKB); }
+    /*| FPOWER '(' val_list ')' { NORMAL_FUNCTION(FPOWER); } */
+    | FPOWER '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FPOWER); }
+    | FQUARTER '(' val_list ')' { NORMAL_FUNCTION(FQUARTER); }
+    | FQUOTE '(' val_list ')' { NORMAL_FUNCTION(FQUOTE); }
+    | FRADIANS '(' val_list ')' { NORMAL_FUNCTION(FRADIANS); }
+    | FRAND '(' ')' { NORMAL_FUNCTION_NO_PARAM(FRAND); } 
+    | FRAND '(' val_list ')' { NORMAL_FUNCTION(FRAND); }
+    | FROUND '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FROUND); }
+    | FROW_COUNT '(' ')' { NORMAL_FUNCTION_NO_PARAM(FROW_COUNT); }
+    /*| FREPEAT '(' val_list ')' { NORMAL_FUNCTION(FREPEAT); } */
+    | FREPEAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FREPEAT); }
+    /*| FREPLACE '(' val_list ')' { NORMAL_FUNCTION(FREPLACE); }*/
+    | FREPLACE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FREPLACE); }
+    | FREVERSE '(' val_list ')' { NORMAL_FUNCTION(FREVERSE); }
+    /*| FRIGHT '(' val_list ')' { NORMAL_FUNCTION(FRIGHT); } */
+    | FRIGHT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FRIGHT); }
+    /*| FRPAD '(' val_list ')' { NORMAL_FUNCTION(FRPAD); } */
+    | FRPAD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FRPAD); }
+    | FRTRIM '(' val_list ')' { NORMAL_FUNCTION(FRTRIM); }
+    | FRELEASE_LOCK '(' val_list ')' { NORMAL_FUNCTION(FRELEASE_LOCK); }
+    | FSEC_TO_TIME '(' val_list ')' { NORMAL_FUNCTION(FSEC_TO_TIME); }
+    | FSEC_TO_DATE '(' val_list ')' { NORMAL_FUNCTION(FSEC_TO_DATE); }
+    | FSHA '(' val_list ')' { NORMAL_FUNCTION(FSHA); }
+    | FSHA1 '(' val_list ')' { NORMAL_FUNCTION(FSHA1); }
+    | FSIGN '(' val_list ')' { NORMAL_FUNCTION(FSIGN); }
+    | FSIN '(' val_list ')' { NORMAL_FUNCTION(FSIN); }
+    | FSLEEP '(' val_list ')' { NORMAL_FUNCTION(FSLEEP); }
+    | FSCHEMA '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSCHEMA); }
+    | FSOUNDEX '(' val_list ')' { NORMAL_FUNCTION(FSOUNDEX); }
+    | FSPACE '(' val_list ')' { NORMAL_FUNCTION(FSPACE); }
+    | FSQRT '(' val_list ')' { NORMAL_FUNCTION(FSQRT); }
+    | FSRID '(' val_list ')' { NORMAL_FUNCTION(FSRID); }
+    | FSTARTPOINT '(' val_list ')' { NORMAL_FUNCTION(FSTARTPOINT); }
+    /*| FSTRCMP '(' val_list ')' { NORMAL_FUNCTION(FSTRCMP); }*/
+    | FSTRCMP '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSTRCMP); }
+    /*| FSTR_TO_DATE '(' val_list ')' { NORMAL_FUNCTION(FSTR_TO_DATE); }*/
+    | FSTR_TO_DATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSTR_TO_DATE); }
+    | FSECOND '(' val_list ')' { NORMAL_FUNCTION(FSECOND); }
+    /*| FSUBTIME '(' val_list ')' { NORMAL_FUNCTION(FSUBTIME); }*/
+    | FSUBTIME '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSUBTIME); }
+    /*| FSUBSTRING '(' val_list ')' { NORMAL_FUNCTION(FSUBSTRING); } */
+    | FSUBSTRING '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSUBSTRING); } 
+    /*| FSUBSTRING_INDEX '(' val_list ')' { NORMAL_FUNCTION(FSUBSTRING_INDEX); }*/
+    | FSUBSTRING_INDEX '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSUBSTRING_INDEX); }
+    | FSESSION_USER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSESSION_USER); }
+    | FSTD '(' val_list ')' { NORMAL_FUNCTION(FSTD); }
+    | FSTDDEV '(' val_list ')' { NORMAL_FUNCTION(FSTDDEV); }
+    | FSTDDEV_POP '(' val_list ')' { NORMAL_FUNCTION(FSTDDEV_POP); }
+    | FSTDDEV_SAMP '(' val_list ')' { NORMAL_FUNCTION(FSTDDEV_SAMP); }
+    /*| FSUBDATE '(' val_list ')' { NORMAL_FUNCTION(FSUBDATE); }*/
+    | FSUBDATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSUBDATE); }
+    | FSUM '(' val_list ')' { NORMAL_FUNCTION(FSUM); }
     | FSUM'(' '*' ')' { NORMAL_FUNCTION_WILD(FSUM); }
-    | FSYSDATE '(' expr ')' { NORMAL_FUNCTION(FSYSDATE); }
-    | FSYSTEM_USER '(' expr ')' { NORMAL_FUNCTION(FSYSTEM_USER); }
-    | FTAN '(' expr ')' { NORMAL_FUNCTION(FTAN); }
-    | FTIMEDIFF '(' expr ')' { NORMAL_FUNCTION(FTIMEDIFF); }
-    | FTIME_FORMAT '(' expr ')' { NORMAL_FUNCTION(FTIME_FORMAT); }
-    | FTIME_TO_SEC '(' expr ')' { NORMAL_FUNCTION(FTIME_TO_SEC); }
-    | FTRUNCATE '(' expr ')' { NORMAL_FUNCTION(FTRUNCATE); }
-    | FTOUCHES '(' expr ')' { NORMAL_FUNCTION(FTOUCHES); }
-    | FTO_DAYS '(' expr ')' { NORMAL_FUNCTION(FTO_DAYS); }
-    /*| FTRIM '(' expr ')' { NORMAL_FUNCTION(FTRIM); } */
-    | FTIME '(' expr ')' { NORMAL_FUNCTION(FTIME); }
-    | FTIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMP); }
-    | FTIMESTAMPADD '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMPADD); }
-    | FTIMESTAMPDIFF '(' expr ')' { NORMAL_FUNCTION(FTIMESTAMPDIFF); }
-    | FVARIANCE '(' expr ')' { NORMAL_FUNCTION(FVARIANCE); }
-    | FVAR_POP '(' expr ')' { NORMAL_FUNCTION(FVAR_POP); }
-    | FVAR_SAMP '(' expr ')' { NORMAL_FUNCTION(FVAR_SAMP); }
-    | FUCASE '(' expr ')' { NORMAL_FUNCTION(FUCASE); }
-    | FUNCOMPRESS '(' expr ')' { NORMAL_FUNCTION(FUNCOMPRESS); }
-    | FUNCOMPRESSED_LENGTH '(' expr ')' { NORMAL_FUNCTION(FUNCOMPRESSED_LENGTH); }
-    | FUNHEX '(' expr ')' { NORMAL_FUNCTION(FUNHEX); }
-    | FUSER '(' expr ')' { NORMAL_FUNCTION(FUSER); }
-    | FUNIX_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FUNIX_TIMESTAMP); }
-    | FUPDATEXML '(' expr ')' { NORMAL_FUNCTION(FUPDATEXML); }
-    | FUPPER '(' expr ')' { NORMAL_FUNCTION(FUPPER); }
-    | FUUID '(' expr ')' { NORMAL_FUNCTION(FUUID); }
-    | FUUID_SHORT '(' expr ')' { NORMAL_FUNCTION(FUUID_SHORT); }
-    | FVERSION '(' expr ')' { NORMAL_FUNCTION(FVERSION); }
-    | FUTC_DATE '(' expr ')' { NORMAL_FUNCTION(FUTC_DATE); }
-    | FUTC_TIME '(' expr ')' { NORMAL_FUNCTION(FUTC_TIME); }
-    | FUTC_TIMESTAMP '(' expr ')' { NORMAL_FUNCTION(FUTC_TIMESTAMP); }
-    | FWEEK '(' expr ')' { NORMAL_FUNCTION(FWEEK); }
-    | FWEEKDAY '(' expr ')' { NORMAL_FUNCTION(FWEEKDAY); }
-    | FWEEKOFYEAR '(' expr ')' { NORMAL_FUNCTION(FWEEKOFYEAR); }
-    | FYEAR '(' expr ')' { NORMAL_FUNCTION(FYEAR); }
-    | FYEARWEEK '(' expr ')' { NORMAL_FUNCTION(FYEARWEEK); }
-    | FX '(' expr ')' { NORMAL_FUNCTION(FX); }
-    | FY '(' expr ')' { NORMAL_FUNCTION(FY); }
+    | FSYSDATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSYSDATE); }
+    | FSYSTEM_USER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSYSTEM_USER); }
+    | FTAN '(' val_list ')' { NORMAL_FUNCTION(FTAN); }
+    /*| FTIMEDIFF '(' val_list ')' { NORMAL_FUNCTION(FTIMEDIFF); }*/
+    | FTIMEDIFF '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTIMEDIFF); }
+    /*| FTIME_FORMAT '(' val_list ')' { NORMAL_FUNCTION(FTIME_FORMAT); }*/
+    | FTIME_FORMAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTIME_FORMAT); }
+    | FTIME_TO_SEC '(' val_list ')' { NORMAL_FUNCTION(FTIME_TO_SEC); }
+    /*| FTRUNCATE '(' val_list ')' { NORMAL_FUNCTION(FTRUNCATE); } */
+    | FTRUNCATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTRUNCATE); }
+    | FTOUCHES '(' val_list ')' { NORMAL_FUNCTION(FTOUCHES); }
+    | FTO_DAYS '(' val_list ')' { NORMAL_FUNCTION(FTO_DAYS); }
+    /*| FTRIM '(' val_list ')' { NORMAL_FUNCTION(FTRIM); } */
+    | FTRIM '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTRIM); }
+    | FTIME '(' val_list ')' { NORMAL_FUNCTION(FTIME); }
+    /*| FTIMESTAMP '(' val_list ')' { NORMAL_FUNCTION(FTIMESTAMP); }*/
+    | FTIMESTAMP '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTIMESTAMP); }
+    /*| FTIMESTAMPADD '(' val_list ')' { NORMAL_FUNCTION(FTIMESTAMPADD); }*/
+    | FTIMESTAMPADD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTIMESTAMPADD); }
+    /*| FTIMESTAMPDIFF '(' val_list ')' { NORMAL_FUNCTION(FTIMESTAMPDIFF); }*/
+    | FTIMESTAMPDIFF '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FTIMESTAMPDIFF); }
+    | FVARIANCE '(' val_list ')' { NORMAL_FUNCTION(FVARIANCE); }
+    | FVAR_POP '(' val_list ')' { NORMAL_FUNCTION(FVAR_POP); }
+    | FVAR_SAMP '(' val_list ')' { NORMAL_FUNCTION(FVAR_SAMP); }
+    | FUCASE '(' val_list ')' { NORMAL_FUNCTION(FUCASE); }
+    | FUNCOMPRESS '(' val_list ')' { NORMAL_FUNCTION(FUNCOMPRESS); }
+    | FUNCOMPRESSED_LENGTH '(' val_list ')' { NORMAL_FUNCTION(FUNCOMPRESSED_LENGTH); }
+    | FUNHEX '(' val_list ')' { NORMAL_FUNCTION(FUNHEX); }
+    | FUSER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUSER); }
+    | FUNIX_TIMESTAMP '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUNIX_TIMESTAMP); }
+    | FUNIX_TIMESTAMP '(' val_list ')' { NORMAL_FUNCTION(FUNIX_TIMESTAMP); }
+    /*| FUPDATEXML '(' val_list ')' { NORMAL_FUNCTION(FUPDATEXML); }*/
+    | FUPDATEXML '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FUPDATEXML); }
+    | FUPPER '(' val_list ')' { NORMAL_FUNCTION(FUPPER); }
+    | FUUID '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUUID); }
+    | FUUID_SHORT '(' val_list ')' { NORMAL_FUNCTION(FUUID_SHORT); }
+    | FVERSION '(' ')' { NORMAL_FUNCTION_NO_PARAM(FVERSION); }
+    | FUTC_DATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUTC_DATE); }
+    | FUTC_TIME '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUTC_TIME); }
+    | FUTC_TIMESTAMP '(' ')' { NORMAL_FUNCTION_NO_PARAM(FUTC_TIMESTAMP); }
+    /*| FWEEK '(' val_list ')' { NORMAL_FUNCTION(FWEEK); }*/
+    | FWEEK '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FWEEK); }
+    | FWEEKDAY '(' val_list ')' { NORMAL_FUNCTION(FWEEKDAY); }
+    | FWEEKOFYEAR '(' val_list ')' { NORMAL_FUNCTION(FWEEKOFYEAR); }
+    | FYEAR '(' val_list ')' { NORMAL_FUNCTION(FYEAR); }
+    /*| FYEARWEEK '(' val_list ')' { NORMAL_FUNCTION(FYEARWEEK); }*/
+    | FYEARWEEK '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FYEARWEEK); }
+    | FX '(' val_list ')' { NORMAL_FUNCTION(FX); }
+    | FY '(' val_list ')' { NORMAL_FUNCTION(FY); }
+    ;
 
-expr: FSUBSTRING '(' val_list ')' {
-        debug("CALL SUBSTR");
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FSUBSTRING;
-        $$ = i;
-    }
-    |FCONCAT '(' val_list ')' {
-        debug("CALL SUBSTR");
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FCONCAT;
-        $$ = i;
-    }
-    | FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
+expr:FSUBSTRING '(' expr FROM expr ')' {  debug("CALL 2 SUBSTR"); }
     | FSUBSTRING '(' expr FROM expr FOR expr ')' {  debug("CALL 3 SUBSTR"); }
-    | FTRIM '(' val_list ')' { 
-        debug("CALL TRIM"); 
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FTRIM;
-        $$ = i;
-    }
     | FTRIM '(' trim_ltb expr FROM val_list ')' { debug("CALL 3 TRIM"); }
-    | FIFNULL'(' val_list')'            {
-        debug("CALL IFNULL");
-        Item *i = calloc(1, sizeof(*i));
-        i->right = $3;
-        i->token1 = FIFNULL;
-        $$ = i;
-    }
+    /* TODO  expr IN expr will shift/reduce  */
+    | FPOSITION '(' expr ')' { debug("CALL 2 FPOSITION"); }
     ;
 
 trim_ltb: LEADING { debug("INT 1"); }
@@ -2204,11 +2583,6 @@ expr: expr REGEXP expr {
         $$ = i;
     };
 
-expr: CURRENT_TIMESTAMP { debug("NOW") };
-   | CURRENT_DATE    { debug("NOW") };
-   | CURRENT_TIME    { debug("NOW") };
-   ;
-
 expr: BINARY expr %prec UMINUS { debug("STRTOBIN"); }
    ;
 
@@ -2221,8 +2595,6 @@ void debug(char *s, ...) {
     printf("rpn: ");
     vfprintf(stdout, s, ap);
     printf("\n");
-    
-    
 }
 
 void

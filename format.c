@@ -75,7 +75,12 @@ void print_expr_item(Item *i, int indent) {
     if (!i) 
         { zprintf(indent,"NULL");} 
     else {
-        if ((i->token1 == NAME) && (i->token2 == 0)) { 
+        if ((i->token1 == NAME)) { 
+            if (i->token2 == GLOBAL)
+                zprintf(indent,"GLOBAL ");
+            else if (i->token2 == SESSION) 
+                zprintf(indent,"SESSION ");
+            
             if (i->prefix && i->name && i->alias)
                 zprintf(indent,"%s.%s AS %s", i->prefix, i->name, i->alias);
             else if (i->prefix && i->name)
@@ -90,7 +95,11 @@ void print_expr_item(Item *i, int indent) {
                 print_expr_item(i->right, 0);
             }
 
-        } else if ((i->token1 == USERVAR) && (i->token2 == 0)) { 
+        } else if ((i->token1 == USERVAR)) { 
+            if (i->token2 == GLOBAL)
+                zprintf(indent,"GLOBAL ");
+            else if (i->token2 == SESSION) 
+                zprintf(indent,"SESSION ");
             zprintf(indent,"%s", i->name); 
         } else if ((i->token1 == STRING) && (i->token2 == 0)) { 
             if (i->prefix && i->name && i->alias)
@@ -142,25 +151,11 @@ void print_expr_item(Item *i, int indent) {
                 zprintf(0, ",");
                 print_expr_item(i->right, 0);
             }
-        } else if ((i ->token1 == FSUBSTRING) ||
-            (i->token1 == FTRIM) ||
-            (i->token1 == FIFNULL) ||
-            (i->token1 == FCONCAT)) {
-                zprintf(indent, FUNCNAME(i->token1)); 
-                zprintf(0,"("); 
-                if (i->right) {
-                    // i->right is list
-                    print_list(i->right, 0);
-                }
-                zprintf(0,")"); 
-
-                if (i->alias)
-                    zprintf(indent, " AS %s", i->alias);
         } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
             zprintf(indent, FUNCNAME(i->token1)); 
             zprintf(0,"("); 
             if (i->right) {
-                print_expr_item(i->right, 0);
+                print_list(i->right, 0);
             }
             if (i->name)
                 zprintf(0,"%s", i->name); 
@@ -332,25 +327,11 @@ void print_expr_stmt(Item *i, int indent) {
         } else if ((i->token1 == NAME) && (i->token2 == 0)) {
             /* 'where 1' stmt*/
             zprintf(indent,"%s", i->name);
-        } else if ((i ->token1 == FSUBSTRING) ||
-            (i->token1 == FTRIM) ||
-            (i->token1 == FIFNULL) ||
-            (i->token1 == FCONCAT)) {
-                zprintf(indent, FUNCNAME(i->token1)); 
-                zprintf(0,"("); 
-                if (i->right) {
-                    // i->right is list
-                    print_list(i->right, 0);
-                }
-                zprintf(0,")"); 
-
-                if (i->alias)
-                    zprintf(indent, " AS %s", i->alias);
         } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
             zprintf(indent, FUNCNAME(i->token1)); 
             zprintf(0,"("); 
             if (i->right) {
-                print_expr_item(i->right, 0);
+                print_list(i->right, 0);
             }
             if (i->name)
                 zprintf(0,"%s", i->name); 
@@ -607,6 +588,23 @@ void set(Stmt *stmt, int indent) {
         while ((node = listNext(iter)) != NULL) {
             Item *i = listNodeValue(node);
             //zprintf(indent,"\t");
+            if (i->token1 == SETNAMES) {
+                zprintf(indent, "SET NAMES ");           
+                Item *i2 = listNodeValue(listNext(iter));
+                zprintf(indent, "%s", i2->name);
+                break;
+            } else if (i->token1 == SETPASSWORD) {
+                zprintf(indent, "SET PASSWORD = ");
+                Item *i2 = listNodeValue(listNext(iter));
+                print_expr_stmt(i2, indent);
+                break;
+            } else if (i->token1 == SETCHARACTER) {
+                zprintf(indent, "SET CHARACTER SET ");           
+                Item *i2 = listNodeValue(listNext(iter));
+                zprintf(indent, "%s", i2->name);
+                break;
+            }
+
             print_expr_stmt(i, indent);
             if (listNextNode(node)) 
                 printf(",\n");
@@ -712,11 +710,40 @@ void stmtInit(Stmt *stmt) {
     stmt->usingList = listCreate();
 }
 
+void show (Item *i, int indent) {
+    if (i->token1 == GLOBAL)
+        zprintf(indent,"GLOBAL ");
+    else if (i->token1 == SESSION) 
+        zprintf(indent,"SESSION ");
+
+    if (i->name) {
+        zprintf(indent,"VARIABLES LIKE %s;", i->name);
+    } else {
+        zprintf(indent,"VARIABLES;");
+    }
+    zprintf(0, "\n");
+}
+
 void stmt(Stmt *stmt, int indent) {
     listIter *iter, *auxIter;
     listNode *node, *auxNode;
 
     switch(stmt->sql_command) {
+        case SQLCOM_SHOW_VARIABLES:
+            zprintf(indent,"SHOW ");
+            show(stmt->show, 0);
+
+            break;
+        case SQLCOM_SHOW_TABLES:
+            zprintf(indent,"DESC ");
+            print_expr_item(stmt->desc, 0);
+            break;
+
+        case SQLCOM_SHOW_FIELDS:
+            zprintf(indent,"DESC ");
+            print_expr_item(stmt->desc, 0);
+            break;
+
         case SQLCOM_SELECT:
             zprintf(indent,"SELECT\n");
             selectColumn(stmt, indent + 1);

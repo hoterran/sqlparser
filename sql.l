@@ -104,6 +104,7 @@ FROM    { return FROM; }
 FULLTEXT    { return FULLTEXT; }
 GRANT    { return GRANT; }
 GROUP    { return GROUP; }
+GLOBAL { return GLOBAL; }
 HAVING    { return HAVING; }
 HIGH_PRIORITY    { return HIGH_PRIORITY; }
 HOUR_MICROSECOND    { return HOUR_MICROSECOND; }
@@ -150,6 +151,9 @@ MINUTE_SECOND    { return MINUTE_SECOND; }
 MOD    { return MOD; }
 MODIFIES    { return MODIFIES; }
 NATURAL    { return NATURAL; }
+SET[ \t\n]+NAMES/[ \t\n]+   { return SETNAMES; }
+SET[ \t\n]+CHARACTER/[ \t\n]+ { return SETCHARACTER; }
+SET[ \t\n]+PASSWORD/[ \t\n]+ { return SETPASSWORD; }
 NOT    { return NOT; }
 NO_WRITE_TO_BINLOG    { return NO_WRITE_TO_BINLOG; }
 NULL    { return NULLX; }
@@ -190,6 +194,7 @@ SECOND_MICROSECOND    { return SECOND_MICROSECOND; }
 SELECT    { return SELECT; }
 SENSITIVE    { return SENSITIVE; }
 SEPARATOR    { return SEPARATOR; }
+SESSION     { return SESSION; }
 SET    { return SET; }
 SHOW    { return SHOW; }
 INT2|SMALLINT    { return SMALLINT; }
@@ -233,7 +238,8 @@ USING    { return USING; }
 UTC_DATE    { return UTC_DATE; }
 UTC_TIME    { return UTC_TIME; }
 UTC_TIMESTAMP    { return UTC_TIMESTAMP; }
-VALUES?    { return VALUES; }
+VARIABLES { return VARIABLES; }
+VALUES    { return VALUES; }
 VARBINARY    { return VARBINARY; }
 VARCHAR(ACTER)?    { return VARCHAR; }
 VARYING    { return VARYING; }
@@ -354,7 +360,7 @@ CURDATE/"(" {return FCURDATE; }
 CURRENT_DATE/"(" {return FCURRENT_DATE; }
 CURTIME/"(" {return FCURTIME; }
 CURTIME_TIME/"(" {return FCURTIME_TIME; }
-CURTIME_TIMESTAMP/"(" {return FCURTIME_TIMESTAMP; }
+CURRENT_TIMESTAMP/"(" {return FCURRENT_TIMESTAMP; }
 DATE/"(" {return FDATE; }
 DATEDIFF/"(" {return FDATEDIFF; }
 DATENAME/"(" {return FDATENAME; }
@@ -365,6 +371,13 @@ DATE_ADD/"(" {return FDATE_ADD; }
 DATE_SUB/"(" {return FDATE_SUB; }
 DATE_FORMAT/"(" {return FDATE_FORMAT; }
 DATABASE/"(" {return FDATABASE; }
+
+DAY/"(" {return FDAY; }
+DAYNAME/"(" {return FDAYNAME; }
+DAYOFMONTH/"(" {return FDAYOFMONTH; }
+DAYOFWEEK/"(" {return FDAYOFWEEK; }
+DAYOFYEAR/"(" {return FDAYOFYEAR; }
+
 DEFAULT/"(" {return FDEFAULT; }
 DECODE/"(" {return FDECODE; }
 DEGREES/"(" {return FDEGREES; }
@@ -409,6 +422,7 @@ HOUR/"(" {return FHOUR; }
 INSERT/"(" {return FINSERT; }
 INSTR/"(" {return FINSTR; }
 IFNULL/"(" {return FIFNULL; }
+IF/"(" {return FIF; }
 INET_ATON/"(" {return FINET_ATON; }
 INET_NTOA/"(" {return FINET_NTOA; }
 INTERIORRINGN/"(" {return FINTERIORRINGN; }
@@ -495,8 +509,7 @@ POLYFROMTEXT/"(" {return FPOLYFROMTEXT; }
 POLYFROMWKB/"(" {return FPOLYFROMWKB; }
 POLYGONFROMTEXT/"(" {return FPOLYGONFROMTEXT; }
 POLYGONFROMWKB/"(" {return FPOLYGONFROMWKB; }
-POW/"(" {return FPOW; }
-POWER/"(" {return FPOWER; }
+POW(ER)?/"(" {return FPOWER; }
 QUARTER/"(" {return FQUARTER; }
 QUOTE/"(" {return FQUOTE; }
 RADIANS/"(" {return FRADIANS; }
@@ -604,6 +617,11 @@ SUM[ ]+    { int c = input(); unput(c);
 @\"[^"\n]+\" |
 @`[^`\n]+` |
 @'[^'\n]+' { yylval.strval = strdup(yytext+1); return USERVAR; }
+
+@@[0-9a-z_.$]+ |
+@@\"[^"\n]+\" |
+@@`[^`\n]+` |
+@@'[^'\n]+' { yylval.strval = strdup(yytext+2); return USERVAR; }
 
 @\"[^"\n]*$ { yyerror("unterminated quoted user variable %s", yytext); }
 @`[^`\n]*$ { yyerror("unterminated quoted user variable %s", yytext); }
