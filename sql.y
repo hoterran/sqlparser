@@ -1120,21 +1120,46 @@ insert_vals_list: '(' insert_vals ')' {
     };
 
 insert_vals: expr {
+        debug("expr");
         listAddNodeTail(curStmt->valueChildList, $1);
         $$ = 1;
     }| NULLX {
+        debug("NULL");
         Item *i = calloc(1, sizeof(*i));
         i->name = strdup("NULL");
         i->token1 = NAME;
 
         listAddNodeTail(curStmt->valueChildList, i);
         $$ = 1;
-    } | DEFAULT { debug("DEFAULT"); $$ = 1;
+    } | DEFAULT { 
+        debug("DEFAULT");
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("DEFAULT");
+        i->token1 = NAME;
+
+        listAddNodeTail(curStmt->valueChildList, i);
+        $$ = 1;
     } | insert_vals ',' expr {
+        debug(", expr "); 
         $$ = $1 + 1;
         listAddNodeTail(curStmt->valueChildList, $3);
-    } | insert_vals ',' DEFAULT { debug("DEFAULT"); $$ = $1 + 1; }
-    ;
+    } | insert_vals ',' NULLX {
+        debug(", NULL"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("NULL");
+        i->token1 = NAME;
+
+        listAddNodeTail(curStmt->valueChildList, i);
+        $$ = $1 + 1;
+    } | insert_vals ',' DEFAULT {
+        debug(", DEFAULT"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("NULL");
+        i->token1 = NAME;
+
+        listAddNodeTail(curStmt->valueChildList, i);
+        $$ = $1 + 1; 
+    };
 
     /* what is it? */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
