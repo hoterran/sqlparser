@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 Stmt *stmtArray[2000];
 int indexArray = 0;
@@ -633,7 +634,7 @@ void debug(char *s, ...);
 %type <intval> show_stmt set_stmt SHOWVARIABLES
 %type <stmt> table_subquery
 %type <listval> val_list opt_val_list case_list
-%type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr
+%type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr expr_or_null_default name_or_default
 %type <intval> select_opts select_expr_list  set_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
@@ -833,7 +834,7 @@ select_expr_list: select_expr {
         $$ = 1;
     };
 
-select_expr: expr opt_as_alias  {
+select_expr: expr_or_null_default opt_as_alias  {
         debug("SIMPLE SELECT");
         if ($2) {
             $1->alias = strdup($2);
@@ -1119,46 +1120,14 @@ insert_vals_list: '(' insert_vals ')' {
         curStmt->valueChildList = listCreate();
     };
 
-insert_vals: expr {
+insert_vals:  expr_or_null_default {
         debug("expr");
         listAddNodeTail(curStmt->valueChildList, $1);
         $$ = 1;
-    }| NULLX {
-        debug("NULL");
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup("NULL");
-        i->token1 = NAME;
-
-        listAddNodeTail(curStmt->valueChildList, i);
-        $$ = 1;
-    } | DEFAULT { 
-        debug("DEFAULT");
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup("DEFAULT");
-        i->token1 = NAME;
-
-        listAddNodeTail(curStmt->valueChildList, i);
-        $$ = 1;
-    } | insert_vals ',' expr {
+    } | insert_vals ',' expr_or_null_default {
         debug(", expr "); 
         $$ = $1 + 1;
         listAddNodeTail(curStmt->valueChildList, $3);
-    } | insert_vals ',' NULLX {
-        debug(", NULL"); 
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup("NULL");
-        i->token1 = NAME;
-
-        listAddNodeTail(curStmt->valueChildList, i);
-        $$ = $1 + 1;
-    } | insert_vals ',' DEFAULT {
-        debug(", DEFAULT"); 
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup("NULL");
-        i->token1 = NAME;
-
-        listAddNodeTail(curStmt->valueChildList, i);
-        $$ = $1 + 1; 
     };
 
     /* what is it? */
@@ -1293,8 +1262,26 @@ update_opts: /* nil */ { debug("update_opts"); $$ = 0; }
    | insert_opts IGNORE { $$ = $1 | 010 ; }
    ;
 
+expr_or_null_default:
+    NULLX {
+        debug(" NULL"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("NULL");
+        i->token1 = NAME;
+
+        $$ = i;
+    } | expr { $$ = $1;}
+    | DEFAULT {
+        debug(" NULL"); 
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("DEFAULT");
+        i->token1 = NAME;
+
+        $$ = i;
+    };
+
 update_asgn_list:
-    NAME COMPARISON expr { 
+    NAME COMPARISON expr_or_null_default { 
         if ($2 != 4) yyerror("bad insert assignment to %s", $1);
         debug("ASSIGN %s %d", $1, $3);
 
@@ -1311,7 +1298,7 @@ update_asgn_list:
         listAddNodeTail(curStmt->updateSetList, c); 
         $$ = 1;
     }
-    | NAME '.' NAME COMPARISON expr { 
+    | NAME '.' NAME COMPARISON expr_or_null_default { 
         if ($4 != 4) yyerror("bad insert assignment to %s", $1);
         debug("ASSIGN %s.%s", $1, $3); 
         Item *i = calloc(1, sizeof(*i));
@@ -1329,7 +1316,7 @@ update_asgn_list:
         listAddNodeTail(curStmt->updateSetList, c); 
         $$ = 1; 
     }
-    | update_asgn_list ',' NAME COMPARISON expr { 
+    | update_asgn_list ',' NAME COMPARISON expr_or_null_default { 
         if ($4 != 4) yyerror("bad insert assignment to %s", $3);
         debug("ASSIGN %s.%s", $3); 
         Item *i = calloc(1, sizeof(*i));
@@ -1345,7 +1332,7 @@ update_asgn_list:
         listAddNodeTail(curStmt->updateSetList, c); 
         $$ = $1 + 1;
     }
-    | update_asgn_list ',' NAME '.' NAME COMPARISON expr { 
+    | update_asgn_list ',' NAME '.' NAME COMPARISON expr_or_null_default { 
         if ($6 != 4) yyerror("bad insert assignment to %s.$s", $3, $5);
         debug("ASSIGN %s.%s", $3, $5); 
         Item *i = calloc(1, sizeof(*i));
@@ -1698,11 +1685,30 @@ set_reduce_stmt: SET {
         }
         debug("set From %p to child %p", curStmt, stmt);
         curStmt = stmt;
-    }
-    ;
+    };
+
+name_or_default:
+    NAME {
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($1);
+        free($1);
+        i->token1 = NAME;
+        $$ = i;
+    } | DEFAULT {
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("DEFAULT");
+        i->token1 = NAME;
+        $$ = i;
+    } | NULLX {
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("NULL");
+        i->token1 = NAME;
+        $$ = i;
+    };
+
 set_stmt: set_reduce_stmt set_list {
         curStmt->sql_command = SQLCOM_SET_OPTION;
-    } | SETNAMES NAME {
+    } | SETNAMES name_or_default {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
         if (curStmt) {
@@ -1717,12 +1723,8 @@ set_stmt: set_reduce_stmt set_list {
         i->token1 = SETNAMES;
         i->name = strdup("NAMES");
 
-        Item *i2 = calloc(1, sizeof(*i2));
-        i2->token1 = NAME;
-        i2->name = strdup($2);
-
         listAddNodeTail(curStmt->setList, i); 
-        listAddNodeTail(curStmt->setList, i2); 
+        listAddNodeTail(curStmt->setList, $2); 
 
         $$=0;
     } | SETPASSWORD set_password_opt COMPARISON expr {
@@ -1742,7 +1744,7 @@ set_stmt: set_reduce_stmt set_list {
         listAddNodeTail(curStmt->setList, i); 
         listAddNodeTail(curStmt->setList, $4); 
         $$ = 0;
-    } | SETCHARACTER SET NAME {
+    } | SETCHARACTER SET name_or_default {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
         if (curStmt) {
@@ -1757,12 +1759,8 @@ set_stmt: set_reduce_stmt set_list {
         i->token1 = SETCHARACTER;
         i->name = strdup("character");
 
-        Item *i2 = calloc(1, sizeof(*i2));
-        i2->token1 = NAME;
-        i2->name = strdup($3);
-
         listAddNodeTail(curStmt->setList, i); 
-        listAddNodeTail(curStmt->setList, i2); 
+        listAddNodeTail(curStmt->setList, $3); 
         $$ = 1;
     };
 
@@ -1790,6 +1788,11 @@ set_opt_expr: expr {
         Item *i = calloc(1, sizeof(*i));
         i->token1 = NAME;
         i->name = strdup("NULL");
+        $$ = i;
+    } | DEFAULT {
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NAME;
+        i->name = strdup("DEFAULT");
         $$ = i;
     };
 
@@ -2618,16 +2621,15 @@ void debug(char *s, ...) {
     printf("\n");
 }
 
-void
-yyerror(char *s, ...)
+void yyerror(char *s, ...)
 {
-  extern yylineno;
+    extern yylineno;
 
-  va_list ap;
-  va_start(ap, s);
-
-  fprintf(stderr, "%d: error: ", yylineno);
-  vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
+    va_list ap;
+    va_start(ap, s);
+    //assert(NULL);
+    fprintf(stderr, "%d: error: ", yylineno);
+    vfprintf(stderr, s, ap);
+    fprintf(stderr, "\n");
 }
 

@@ -41,7 +41,7 @@ char* tmp(int cmp) {
     else if (cmp == NOT) 
         return "NOT";
     else if (cmp == NULLX) 
-        return "NULLX";
+        return "NULL";
     else if (cmp == ANDOP) 
         return "AND";
     else if (cmp == OR) 
