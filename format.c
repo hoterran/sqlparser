@@ -589,21 +589,26 @@ void set(Stmt *stmt, int indent) {
             Item *i = listNodeValue(node);
             //zprintf(indent,"\t");
             if (i->token1 == SETNAMES) {
-                zprintf(indent, "SET NAMES ");           
+                zprintf(indent, "NAMES ");           
                 Item *i2 = listNodeValue(listNext(iter));
                 zprintf(indent, "%s", i2->name);
                 break;
             } else if (i->token1 == SETPASSWORD) {
-                zprintf(indent, "SET PASSWORD = ");
+                zprintf(indent, "PASSWORD = ");
                 Item *i2 = listNodeValue(listNext(iter));
                 print_expr_stmt(i2, indent);
                 break;
             } else if (i->token1 == SETCHARACTER) {
-                zprintf(indent, "SET CHARACTER SET ");           
+                zprintf(indent, "CHARACTER SET ");           
                 Item *i2 = listNodeValue(listNext(iter));
                 zprintf(indent, "%s", i2->name);
                 break;
             }
+
+            if (i->token2 == GLOBAL)
+                zprintf(indent,"GLOBAL ");
+            else if (i->token2 == SESSION) 
+                zprintf(indent,"SESSION ");
 
             print_expr_stmt(i, indent);
             if (listNextNode(node)) 
@@ -710,16 +715,19 @@ void stmtInit(Stmt *stmt) {
     stmt->usingList = listCreate();
 }
 
-void show (Item *i, int indent) {
+void show (Stmt *st, int indent, char *s) {
+    Item *i = st->show;
     if (i->token1 == GLOBAL)
         zprintf(indent,"GLOBAL ");
     else if (i->token1 == SESSION) 
         zprintf(indent,"SESSION ");
 
     if (i->name) {
-        zprintf(indent,"VARIABLES LIKE %s;", i->name);
+        zprintf(indent,"%s LIKE %s;", s, i->name);
     } else {
-        zprintf(indent,"VARIABLES;");
+        zprintf(indent,"%s ", s);
+        where(st, indent);
+        zprintf(indent,";");
     }
     zprintf(0, "\n");
 }
@@ -729,9 +737,19 @@ void stmt(Stmt *stmt, int indent) {
     listNode *node, *auxNode;
 
     switch(stmt->sql_command) {
+        case SQLCOM_USE:
+            zprintf(indent,"USE ");
+            print_expr_item(stmt->use, 0);
+
+            break;
         case SQLCOM_SHOW_VARIABLES:
             zprintf(indent,"SHOW ");
-            show(stmt->show, 0);
+            show(stmt, 0, "VARIABLES ");
+
+            break;
+        case SQLCOM_SHOW_COLLATIONS:
+            zprintf(indent,"SHOW ");
+            show(stmt, 0, "COLLATIONS ");
 
             break;
         case SQLCOM_SHOW_TABLES:

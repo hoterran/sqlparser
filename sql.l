@@ -19,8 +19,8 @@ int oldstate;
 
 %%
 
-    /* keywords */
-
+    /* reserved key */
+ACCESSIBLE  { return ACCESSIBLE; }
 ADD         { return ADD; }
 ALL         { return ALL; }
 ALTER       { return ALTER; }
@@ -31,15 +31,16 @@ ANALYZE     { return ANALYZE; }
     */
 <BTWMODE>AND    { BEGIN INITIAL; return AND; }
 AND    { return ANDOP; }
-ANY     { return ANY; }
 AS    { return AS; }
 ASC    { return ASC; }
-AUTO_INCREMENT    { return AUTO_INCREMENT; }
+ASENSITIVE { return ASENSITIVE;}
+
+    /*AUTO_INCREMENT    { return AUTO_INCREMENT; } */
 BEFORE    { return BEFORE; }
 BETWEEN    { BEGIN BTWMODE; return BETWEEN; }
 INT8|BIGINT    { return BIGINT; }
 BINARY    { return BINARY; }
-BIT    { return BIT; }
+    /* BIT    { return BIT; } */
 BLOB    { return BLOB; }
 BOTH    { return BOTH; }
 BY    { return BY; }
@@ -51,8 +52,9 @@ CHAR(ACTER)?    { return CHAR; }
 CHECK    { return CHECK; }
 COLLATE    { return COLLATE; }
 COLUMN    { return COLUMN; }
-COMMENT    { return COMMENT; }
+    /* COMMENT    { return COMMENT; } */
 CONDITION    { return CONDITION; }
+    /* CONNECTION   { return CONNECTION; } */
 CONSTRAINT    { return CONSTRAINT; }
 CONTINUE    { return CONTINUE; }
 CONVERT    { return CONVERT; }
@@ -65,8 +67,8 @@ CURRENT_USER    { return CURRENT_USER; }
 CURSOR    { return CURSOR; }
 DATABASE    { return DATABASE; }
 DATABASES    { return DATABASES; }
-DATE    { return DATE; }
-DATETIME    { return DATETIME; }
+    /* DATE    { return DATE; } */
+    /* DATETIME    { return DATETIME; } */
 DAY_HOUR    { return DAY_HOUR; }
 DAY_MICROSECOND    { return DAY_MICROSECOND; }
 DAY_MINUTE    { return DAY_MINUTE; }
@@ -88,23 +90,26 @@ DUAL    { return DUAL; }
 EACH    { return EACH; }
 ELSE    { return ELSE; }
 ELSEIF    { return ELSEIF; }
-END    { return END; }
-ENUM { return ENUM; }
-ESCAPED    { return ESCAPED; }
+ENCLOSED    { return ENCLOSED; }
+ESCAPED     { return ESCAPED; }
+    /* END    { return END; } 
+        ENUM { return ENUM; } */
 EXISTS    { yylval.subtok = 0; return EXISTS; }
 NOT[ \t\n]+EXISTS    { yylval.subtok = 1; return EXISTS; }
 EXIT    { return EXIT; }
 EXPLAIN    { return EXPLAIN; }
+FALSE    { return FALSE; }
 FETCH    { return FETCH; }
-FLOAT4?    { return FLOAT; }
+FLOAT[4|8]?    { return FLOAT; }
 FOR    { return FOR; }
 FORCE    { return FORCE; }
 FOREIGN    { return FOREIGN; }
 FROM    { return FROM; }
 FULLTEXT    { return FULLTEXT; }
+    /* GOTO    { return GOTO; } */
 GRANT    { return GRANT; }
 GROUP    { return GROUP; }
-GLOBAL { return GLOBAL; }
+    /* GLOBAL { return GLOBAL; } */
 HAVING    { return HAVING; }
 HIGH_PRIORITY    { return HIGH_PRIORITY; }
 HOUR_MICROSECOND    { return HOUR_MICROSECOND; }
@@ -113,25 +118,28 @@ HOUR_SECOND    { return HOUR_SECOND; }
 IF    { return IF; }
 IGNORE    { return IGNORE; }
 IN    { return IN; }
+INDEX    { return INDEX; }
 INFILE    { return INFILE; }
 INNER    { return INNER; }
 INOUT    { return INOUT; }
 INSENSITIVE    { return INSENSITIVE; }
 INSERT    { return INSERT; }
-INT4?|INTEGER    { return INTEGER; }
+INT|INT3|INT4|INT8|INTEGER    { return INTEGER; }
 INTERVAL    { return INTERVAL; }
 INTO    { return INTO; }
 IS    { return IS; }
 ITERATE    { return ITERATE; }
 JOIN    { return JOIN; }
-INDEX|KEY    { return KEY; }
+KEY    { return KEY; }
 KEYS    { return KEYS; }
 KILL    { return KILL; }
+    /* LABEL { return LABEL; } */
 LEADING    { return LEADING; }
 LEAVE    { return LEAVE; }
 LEFT    { return LEFT; }
 LIKE    { return LIKE; }
 LIMIT    { return LIMIT; }
+LINER   { return LINER; }
 LINES    { return LINES; }
 LOAD    { return LOAD; }
 LOCALTIME    { return LOCALTIME; }
@@ -157,7 +165,7 @@ SET[ \t\n]+PASSWORD/[ \t\n]+ { return SETPASSWORD; }
 NOT    { return NOT; }
 NO_WRITE_TO_BINLOG    { return NO_WRITE_TO_BINLOG; }
 NULL    { return NULLX; }
-NUMBER    { return NUMBER; }
+NUMERIC { return NUMERIC; }
 ON    { return ON; }
 ON[ \t\n]+DUPLICATE { return ONDUPLICATE; } /* hack due to limited lookahead */
 OPTIMIZE    { return OPTIMIZE; }
@@ -172,9 +180,12 @@ PRECISION    { return PRECISION; }
 PRIMARY    { return PRIMARY; }
 PROCEDURE    { return PROCEDURE; }
 PURGE    { return PURGE; }
-QUICK    { return QUICK; }
+    /* RANGE { return RANGE; } */
+    /* QUICK    { return QUICK; } */
 READ    { return READ; }
 READS    { return READS; }
+    /* READ_ONLY { return READ_ONLY ; }
+    READ_WRITE { return READ_WRITE ; } */
 REAL    { return REAL; }
 REFERENCES    { return REFERENCES; }
 REGEXP|RLIKE    { return REGEXP; }
@@ -187,19 +198,28 @@ RESTRICT    { return RESTRICT; }
 RETURN    { return RETURN; }
 REVOKE    { return REVOKE; }
 RIGHT    { return RIGHT; }
-ROLLUP    { return ROLLUP; }
+    /* ROLLUP    { return ROLLUP; } */
 SCHEMA    { return SCHEMA; }
 SCHEMAS    { return SCHEMAS; }
 SECOND_MICROSECOND    { return SECOND_MICROSECOND; }
 SELECT    { return SELECT; }
 SENSITIVE    { return SENSITIVE; }
 SEPARATOR    { return SEPARATOR; }
-SESSION     { return SESSION; }
+    /* SESSION     { return SESSION; } */
+
 SET    { return SET; }
+
 SHOW    { return SHOW; }
+
+SHOW[ \t\n]+COLLATION { return SHOWCOLLATION; }
+
+SHOW[ \t\n]+VARIABLES { yylval.intval = 0; return SHOWVARIABLES; }
+SHOW[ \t\n]+GLOBAL[ \t\n]+VARIABLES { yylval.intval = 1;  return SHOWVARIABLES; }
+SHOW[ \t\n]+SESSION[ \t\n]+VARIABLES { yylval.intval = 2;  return SHOWVARIABLES; }
+
 INT2|SMALLINT    { return SMALLINT; }
-SOME    { return SOME; }
-SONAME    { return SONAME; }
+    /* SOME    { return SOME; }
+    SONAME    { return SONAME; } */
 SPATIAL    { return SPATIAL; }
 SPECIFIC    { return SPECIFIC; }
 SQL    { return SQL; }
@@ -213,19 +233,21 @@ SSL    { return SSL; }
 STARTING    { return STARTING; }
 STRAIGHT_JOIN    { return STRAIGHT_JOIN; }
 TABLE    { return TABLE; }
-TEMPORARY    { return TEMPORARY; }
+    /* TEMPORARY    { return TEMPORARY; } */
 TERMINATED    { return TERMINATED; }
-TEXT    { return TEXT; }
+    /* TEXT    { return TEXT; } */
 THEN    { return THEN; }
 
     /* //TIME    { return TIME; }  time is not keyword can be column name */
 
-TIMESTAMP    { return TIMESTAMP; }
+TINYBLOB    { return TINYBLOB; }
+    /* TIMESTAMP    { return TIMESTAMP; } */
 INT1|TINYINT    { return TINYINT; }
 TINYTEXT    { return TINYTEXT; }
 TO    { return TO; }
 TRAILING    { return TRAILING; }
 TRIGGER    { return TRIGGER; }
+TRUE { return TRUE; }
 UNDO    { return UNDO; }
 UNION    { return UNION; }
 UNIQUE    { return UNIQUE; }
@@ -238,7 +260,7 @@ USING    { return USING; }
 UTC_DATE    { return UTC_DATE; }
 UTC_TIME    { return UTC_TIME; }
 UTC_TIMESTAMP    { return UTC_TIMESTAMP; }
-VARIABLES { return VARIABLES; }
+    /* VARIABLES { return VARIABLES; } */
 VALUES    { return VALUES; }
 VARBINARY    { return VARBINARY; }
 VARCHAR(ACTER)?    { return VARCHAR; }
@@ -248,8 +270,9 @@ WHERE    { return WHERE; }
 WHILE    { return WHILE; }
 WITH    { return WITH; }
 WRITE    { return WRITE; }
+X509    { return X509; }
 XOR    { return XOR; }
-YEAR    { return YEAR; }
+    /* YEAR    { return YEAR; } */
 YEAR_MONTH    { return YEAR_MONTH; }
 ZEROFILL    { return ZEROFILL; }
 
@@ -604,6 +627,10 @@ SUM[ ]+    { int c = input(); unput(c);
            return NAME; }
     */
 
+    /*
+AUTO_INCREMENT|BIT|COMMENT|DATE|DATETIME|END|ENUM|GLOBAL|QUICK|READ_ONLY|READ_WRITE|ROLLUP|SESSION|SOME|TEMPORARY|TEXT|TIME|TIMESTAMP|YEAR|GLOBAL|SESSION { yylval.strval = strdup(yytext); return NAMESPEC1;}
+    */
+
 [A-Za-z\?][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
                           return NAME; }
 `[^`/\\.\n]+`           { yylval.strval = strdup(yytext+1);
@@ -616,12 +643,12 @@ SUM[ ]+    { int c = input(); unput(c);
 @[0-9a-z_.$]+ |
 @\"[^"\n]+\" |
 @`[^`\n]+` |
-@'[^'\n]+' { yylval.strval = strdup(yytext+1); return USERVAR; }
+@'[^'\n]+' { yylval.strval = strdup(yytext); return USERVAR; }
 
 @@[0-9a-z_.$]+ |
 @@\"[^"\n]+\" |
 @@`[^`\n]+` |
-@@'[^'\n]+' { yylval.strval = strdup(yytext+2); return USERVAR; }
+@@'[^'\n]+' { yylval.strval = strdup(yytext); return USERVAR; }
 
 @\"[^"\n]*$ { yyerror("unterminated quoted user variable %s", yytext); }
 @`[^`\n]*$ { yyerror("unterminated quoted user variable %s", yytext); }

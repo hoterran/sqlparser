@@ -23,6 +23,15 @@ void debug(char *s, ...);
         (yyval.item) = i;}\
         while(0)
 
+#define NORMAL_FUNCTION_DISTINCT(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->token1 = f;\
+        i->token2 = DISTINCT;\
+        i->right = (yyvsp[(4) - (5)].item);\
+        (yyval.item) = i;}\
+        while(0)
+
 #define NORMAL_FUNCTION_ANY_PARAM(f) do {\
         debug ("CALL %s", #f);\
         Item *i = calloc(1, sizeof(*i));\
@@ -46,7 +55,7 @@ void debug(char *s, ...);
         (yyval.item) = i;}\
         while(0)
 
-//extern int yydebug = 1;
+// extern int yydebug = 1;
 
 %}
 
@@ -93,6 +102,7 @@ void debug(char *s, ...);
 %nonassoc UMINUS
 
     /* TODO sql/lex.h */
+%token ACCESSIBLE
 %token ADD
 %token ALL
 %token ALTER
@@ -100,8 +110,8 @@ void debug(char *s, ...);
 %token AND
 %token ANY
 %token AS
+%token ASENSITIVE
 %token ASC
-%token AUTO_INCREMENT
 %token BEFORE
 %token BETWEEN
 %token BIGINT
@@ -118,7 +128,6 @@ void debug(char *s, ...);
 %token CHECK
 %token COLLATE
 %token COLUMN
-%token COMMENT
 %token CONDITION
 %token CONSTRAINT
 %token CONTINUE
@@ -132,8 +141,6 @@ void debug(char *s, ...);
 %token CURSOR
 %token DATABASE
 %token DATABASES
-%token DATE
-%token DATETIME
 %token DAY_HOUR
 %token DAY_MICROSECOND
 %token DAY_MINUTE
@@ -156,12 +163,12 @@ void debug(char *s, ...);
 %token ELSE
 %token ELSEIF
 %token ENCLOSED
-%token END
 %token ENUM
 %token ESCAPED
 %token <subtok> EXISTS
 %token EXIT
 %token EXPLAIN
+%token FALSE
 %token FETCH
 %token FLOAT
 %token FOR
@@ -171,7 +178,6 @@ void debug(char *s, ...);
 %token FULLTEXT
 %token GRANT
 %token GROUP
-%token GLOBAL
 %token HAVING
 %token HIGH_PRIORITY
 %token HOUR_MICROSECOND
@@ -201,6 +207,7 @@ void debug(char *s, ...);
 %token LIKE
 %token LIMIT
 %token LINES
+%token LINER
 %token LOAD
 %token LOCALTIME
 %token LOCALTIMESTAMP
@@ -222,7 +229,7 @@ void debug(char *s, ...);
 %token NOT
 %token NO_WRITE_TO_BINLOG
 %token NULLX
-%token NUMBER
+%token NUMERIC
 %token ON
 %token ONDUPLICATE
 %token OPTIMIZE
@@ -237,7 +244,6 @@ void debug(char *s, ...);
 %token PRIMARY
 %token PROCEDURE
 %token PURGE
-%token QUICK
 %token READ
 %token READS
 %token REAL
@@ -252,22 +258,20 @@ void debug(char *s, ...);
 %token RETURN
 %token REVOKE
 %token RIGHT
-%token ROLLUP
 %token SCHEMA
 %token SCHEMAS
 %token SECOND_MICROSECOND
 %token SELECT
 %token SENSITIVE
 %token SEPARATOR
-%token SESSION
 %token SET
 %token SETNAMES
 %token SETCHARACTER
 %token SETPASSWORD
 %token SHOW
+%token SHOWVARIABLES
+%token SHOWCOLLATION
 %token SMALLINT
-%token SOME
-%token SONAME
 %token SPATIAL
 %token SPECIFIC
 %token SQL
@@ -281,12 +285,9 @@ void debug(char *s, ...);
 %token STARTING
 %token STRAIGHT_JOIN
 %token TABLE
-%token TEMPORARY
-%token TEXT
+%token TRUE 
 %token TERMINATED
 %token THEN
-%token TIME
-%token TIMESTAMP
 %token TINYBLOB
 %token TINYINT
 %token TINYTEXT
@@ -305,7 +306,6 @@ void debug(char *s, ...);
 %token UTC_DATE
 %token UTC_TIME
 %token UTC_TIMESTAMP
-%token VARIABLES
 %token VALUES
 %token VARBINARY
 %token VARCHAR
@@ -316,7 +316,7 @@ void debug(char *s, ...);
 %token WITH
 %token WRITE
 %token XOR
-%token YEAR
+%token X509
 %token YEAR_MONTH
 %token ZEROFILL
 
@@ -630,15 +630,15 @@ void debug(char *s, ...);
 %token BITOR_OP BITXOR_OP BITAND_OP
 
 %type <stmt> select_stmt
-%type <intval> show_stmt set_stmt
+%type <intval> show_stmt set_stmt SHOWVARIABLES
 %type <stmt> table_subquery
 %type <listval> val_list opt_val_list case_list
-%type <item> expr select_expr set_expr set_password_opt
+%type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr
 %type <intval> select_opts select_expr_list  set_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
 %type <intval> left_or_right opt_left_or_right_outer column_list
-%type <intval> index_list opt_for_join show_opt
+%type <intval> index_list opt_for_join 
 %type <strval> opt_as_alias
 
 %type <intval> delete_opts delete_list
@@ -646,7 +646,6 @@ void debug(char *s, ...);
 %type <intval> insert_asgn_list opt_if_not_exists update_opts update_asgn_list
 %type <intval> opt_temporary opt_length opt_binary opt_uz enum_list
 %type <intval> column_atts data_type opt_ignore_replace create_col_list
-%type <strval> set_misc_key_opt 
 
 %start stmt_list
 
@@ -732,7 +731,7 @@ opt_asc_desc: /* nil */ { $$ = 0; }
     ;
 
 opt_with_rollup: /* nil */  { $$ = 0; }
-   | WITH ROLLUP  { $$ = 1; }
+   | WITH NAME { $$ = 1; }
    ;
 
 opt_having: /* nil */ | HAVING expr {
@@ -904,9 +903,8 @@ table_factor:
 opt_as: AS 
   | /* nil */
   ;
-
-opt_as_alias: AS NAME { debug ("ALIAS %s", $2); $$=$2 }
-  | NAME              { debug ("ALIAS %s", $1); $$=$1 }
+    /* alias possible keywords */
+opt_as_alias: opt_as NAME   { debug ("ALIAS %s", $2); $$=$2 }
   | /* nil */    {$$ = NULL}
   ;
 
@@ -1019,7 +1017,7 @@ delete_stmt: delete_reduce_stmt delete_opts FROM NAME '.' NAME
     ;
 
 delete_opts: delete_opts LOW_PRIORITY { $$ = $1 + 01; }
-   | delete_opts QUICK { $$ = $1 + 02; }
+   /* TODO | delete_opts NAME { $$ = $1 + 02; } */
    | delete_opts IGNORE { $$ = $1 + 04; }
    | /* nil */ { $$ = 0; }
    ;
@@ -1121,17 +1119,21 @@ insert_vals_list: '(' insert_vals ')' {
         curStmt->valueChildList = listCreate();
     };
 
-insert_vals:
-    expr {
+insert_vals: expr {
         listAddNodeTail(curStmt->valueChildList, $1);
         $$ = 1;
-    }
-    | DEFAULT { debug("DEFAULT"); $$ = 1;}
-    | insert_vals ',' expr {
+    }| NULLX {
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup("NULL");
+        i->token1 = NAME;
+
+        listAddNodeTail(curStmt->valueChildList, i);
+        $$ = 1;
+    } | DEFAULT { debug("DEFAULT"); $$ = 1;
+    } | insert_vals ',' expr {
         $$ = $1 + 1;
         listAddNodeTail(curStmt->valueChildList, $3);
-    }
-    | insert_vals ',' DEFAULT { debug("DEFAULT"); $$ = $1 + 1; }
+    } | insert_vals ',' DEFAULT { debug("DEFAULT"); $$ = $1 + 1; }
     ;
 
     /* what is it? */
@@ -1408,12 +1410,12 @@ column_atts: /* nil */ { $$ = 0; }
     | column_atts DEFAULT INTNUM        { debug("ATTR DEFAULT NUMBER %d", $3); $$ = $1 + 1; }
     | column_atts DEFAULT APPROXNUM     { debug("ATTR DEFAULT FLOAT %g", $3); $$ = $1 + 1; }
     | column_atts DEFAULT BOOL          { debug("ATTR DEFAULT BOOL %d", $3); $$ = $1 + 1; }
-    | column_atts AUTO_INCREMENT        { debug("ATTR AUTOINC"); $$ = $1 + 1; }
+    | column_atts NAME { debug("ATTR AUTOINC"); $$ = $1 + 1; }
     | column_atts UNIQUE '(' column_list ')' { debug("ATTR UNIQUEKEY %d", $4); $$ = $1 + 1; }
     | column_atts UNIQUE KEY { debug("ATTR UNIQUEKEY"); $$ = $1 + 1; }
     | column_atts PRIMARY KEY { debug("ATTR PRIKEY"); $$ = $1 + 1; }
     | column_atts KEY { debug("ATTR PRIKEY"); $$ = $1 + 1; }
-    | column_atts COMMENT STRING { debug("ATTR COMMENT %s", $3); free($3); $$ = $1 + 1; }
+    | column_atts NAME STRING { debug("ATTR COMMENT %s", $3); free($3); $$ = $1 + 1; }
     ;
 
 opt_length: /* nil */ { $$ = 0; }
@@ -1436,7 +1438,18 @@ opt_csc: /* nil */
    ;
 
 data_type:
-     BIT opt_length { $$ = 10000 + $2; }
+     NAME opt_length {
+        $$ = 10000 + $2;
+        
+       /* | DATE { $$ = 100001; } 
+       | TIME { $$ = 100002; }
+       | TIMESTAMP { $$ = 100003; }
+       | DATETIME { $$ = 100004; }
+       | YEAR { $$ = 100005; }
+       */
+    /* } | NAME opt_binary opt_csc { $$ = 171000 + $2; */
+    /*TEXT*/ 
+    }
    | TINYINT opt_length opt_uz { $$ = 10000 + $2; }
    | SMALLINT opt_length opt_uz { $$ = 20000 + $2 + $3; }
    | MEDIUMINT opt_length opt_uz { $$ = 30000 + $2 + $3; }
@@ -1447,11 +1460,6 @@ data_type:
    | DOUBLE opt_length opt_uz { $$ = 80000 + $2 + $3; }
    | FLOAT opt_length opt_uz { $$ = 90000 + $2 + $3; }
    | DECIMAL opt_length opt_uz { $$ = 110000 + $2 + $3; }
-   | DATE { $$ = 100001; }
-   | TIME { $$ = 100002; }
-   | TIMESTAMP { $$ = 100003; }
-   | DATETIME { $$ = 100004; }
-   | YEAR { $$ = 100005; }
    | CHAR opt_length opt_csc { $$ = 120000 + $2; }
    | VARCHAR '(' INTNUM ')' opt_csc { $$ = 130000 + $3; }
    | BINARY opt_length { $$ = 140000 + $2; }
@@ -1461,7 +1469,6 @@ data_type:
    | MEDIUMBLOB { $$ = 160003; }
    | LONGBLOB { $$ = 160004; }
    | TINYTEXT opt_binary opt_csc { $$ = 170000 + $2; }
-   | TEXT opt_binary opt_csc { $$ = 171000 + $2; }
    | MEDIUMTEXT opt_binary opt_csc { $$ = 172000 + $2; }
    | LONGTEXT opt_binary opt_csc { $$ = 173000 + $2; }
    | ENUM '(' enum_list ')' opt_csc { $$ = 200000 + $3; }
@@ -1481,13 +1488,15 @@ opt_ignore_replace: /* nil */ { $$ = 0; }
    ;
 
 opt_temporary:   /* nil */ { $$ = 0; }
-    | TEMPORARY { $$ = 1;}
+    | NAME { $$ = 1;}
     ;
 
+    /* SHOW */
 stmt: show_stmt { debug("stmt");}
     ;
+    /* TODO show global status where Variable_name in ('Bytes_received'); */
 
-show_stmt: SHOW show_opt VARIABLES {
+show_reduce_stmt: SHOWVARIABLES {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
         if (curStmt) {
@@ -1497,10 +1506,10 @@ show_stmt: SHOW show_opt VARIABLES {
         curStmt = stmt;
 
         Item *i = calloc(1, sizeof(*i));
-        i->token1 = $2;
+        i->token1 = $1;
         curStmt->show = i;
         stmt->sql_command = SQLCOM_SHOW_VARIABLES;
-    } | SHOW show_opt VARIABLES LIKE STRING {
+    } | SHOWCOLLATION {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
         if (curStmt) {
@@ -1510,34 +1519,105 @@ show_stmt: SHOW show_opt VARIABLES {
         curStmt = stmt;
 
         Item *i = calloc(1, sizeof(*i));
-        i->token1 = $2;
-        i->name = strdup($5);
-        free($5);
         curStmt->show = i;
-
-        stmt->sql_command = SQLCOM_SHOW_VARIABLES;
-    } | SHOW show_opt VARIABLES LIKE NAME {
-        Stmt *stmt = calloc(1, sizeof(*stmt));
-        stmtInit(stmt);
-        if (curStmt) {
-            stmt->father = curStmt;
-        }
-        debug("desc From %p to child %p", curStmt, stmt);
-        curStmt = stmt;
-
-        Item *i = calloc(1, sizeof(*i));
-        i->token1 = $2;
-        i->name = strdup($5);
-        free($5);
-        curStmt->show = i;
-
-        stmt->sql_command = SQLCOM_SHOW_VARIABLES;
+        stmt->sql_command = SQLCOM_SHOW_COLLATIONS;
     };
 
-show_opt: GLOBAL {$$ = GLOBAL;}
-    | SESSION {$$ = SESSION;}
-    | /**/ {$$ = 0;}
-    ;
+show_stmt: show_reduce_stmt opt_where {
+        debug("show where");
+        $$=0;
+    } | show_reduce_stmt LIKE STRING {
+        debug("show like ");
+        Item *i = curStmt->show;
+        i->name = strdup($3);
+        free($3);
+    } | show_reduce_stmt LIKE NAME {
+        /* NAME for ? */
+        debug("show like ");
+        Item *i = curStmt->show;
+        i->name = strdup($3);
+        free($3);
+    };
+
+set_opt: NAME NAME { /* global xxx =  */
+        if (0 == strncasecmp($1, "global", 6)) {
+            Item *i = calloc(1, sizeof(*i));
+            i->token2 = GLOBAL;
+            i->token1 = NAME;
+            i->name = strdup($2);
+            free($1);
+            free($2);
+            
+            $$ = i;
+        } else if ( 0 == strncasecmp($1, "session", 7)) {
+            Item *i = calloc(1, sizeof(*i));
+            i->token2 = SESSION;
+            i->token1 = NAME;
+            i->name = strdup($2);
+            free($1);
+            free($2);
+            
+            $$ = i;
+        } else {
+            yyerror("show | set %s error ", $1);
+            $$ = NULL;
+        }
+    } | NAME { /* xxx = */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NAME;
+        i->name = strdup($1);
+        free($1);
+            
+        $$ = i;
+    } | USERVAR { /* @xxx = */
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = USERVAR;
+        i->name = strdup($1);
+        free($1);
+
+        $$ = i;
+    } | NAME USERVAR { /* global @xxx = */
+        if (0 == strncasecmp($1, "global", 6)) {
+            Item *i = calloc(1, sizeof(*i));
+            i->token2 = GLOBAL;
+            i->token1 = USERVAR;
+            i->name = strdup($2);
+            free($1);
+            free($2);
+            
+            $$ = i;
+        } else if ( 0 == strncasecmp($1, "session", 7)) {
+            Item *i = calloc(1, sizeof(*i));
+            i->token2 = SESSION;
+            i->token1 = USERVAR;
+            i->name = strdup($2);
+            free($1);
+            free($2);
+            
+            $$ = i;
+        }
+    };
+
+    /* USE */
+stmt:use_stmt { debug ("STMT");};
+
+use_stmt: USE NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        i->token1 = NAME;
+        free($2);
+        curStmt->use = i;
+
+        stmt->sql_command = SQLCOM_USE;
+    }
 
     /* DESC */
 stmt: desc_stmt { debug("STMT");}
@@ -1597,7 +1677,7 @@ set_reduce_stmt: SET {
     ;
 set_stmt: set_reduce_stmt set_list {
         curStmt->sql_command = SQLCOM_SET_OPTION;
-    } | SETNAMES DEFAULT {
+    } | SETNAMES NAME {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
         if (curStmt) {
@@ -1614,30 +1694,7 @@ set_stmt: set_reduce_stmt set_list {
 
         Item *i2 = calloc(1, sizeof(*i2));
         i2->token1 = NAME;
-        i2->name = strdup("DEFAULT");
-
-        listAddNodeTail(curStmt->setList, i); 
-        listAddNodeTail(curStmt->setList, i2); 
-
-        $$=0;
-    } | SETNAMES NAME {
-        Stmt *stmt = calloc(1, sizeof(*stmt));
-        stmtInit(stmt);
-        if (curStmt) {
-            stmt->father = curStmt;
-        }
-        debug("set From %p to child %p", curStmt, stmt);
-        curStmt = stmt;
-
-        curStmt->sql_command = SQLCOM_SET_OPTION;
-        debug("SET NAMES ");
-        Item *i = calloc(1, sizeof(*i));
-        i->token1 = SETNAMES;
-
-        Item *i2 = calloc(1, sizeof(*i2));
-        i2->token1 = NAME;
         i2->name = strdup($2);
-        free($2);
 
         listAddNodeTail(curStmt->setList, i); 
         listAddNodeTail(curStmt->setList, i2); 
@@ -1660,28 +1717,6 @@ set_stmt: set_reduce_stmt set_list {
         listAddNodeTail(curStmt->setList, i); 
         listAddNodeTail(curStmt->setList, $4); 
         $$ = 0;
-    } | SETCHARACTER SET DEFAULT {
-        Stmt *stmt = calloc(1, sizeof(*stmt));
-        stmtInit(stmt);
-        if (curStmt) {
-            stmt->father = curStmt;
-        }
-        debug("set From %p to child %p", curStmt, stmt);
-        curStmt = stmt;
-
-        curStmt->sql_command = SQLCOM_SET_OPTION;
-        debug("SET CHARACTER default ");
-        Item *i = calloc(1, sizeof(*i));
-        i->token1 = SETCHARACTER;
-        i->name = strdup("character");
-
-        Item *i2 = calloc(1, sizeof(*i2));
-        i2->token1 = NAME;
-        i2->name = strdup("default");
-
-        listAddNodeTail(curStmt->setList, i); 
-        listAddNodeTail(curStmt->setList, i2); 
-        $$ = 1;
     } | SETCHARACTER SET NAME {
         Stmt *stmt = calloc(1, sizeof(*stmt));
         stmtInit(stmt);
@@ -1692,7 +1727,7 @@ set_stmt: set_reduce_stmt set_list {
         curStmt = stmt;
 
         curStmt->sql_command = SQLCOM_SET_OPTION;
-        debug("SET CHARACTER SET %s", $3);
+        debug("SET CHARACTER default ");
         Item *i = calloc(1, sizeof(*i));
         i->token1 = SETCHARACTER;
         i->name = strdup("character");
@@ -1719,76 +1754,41 @@ set_list: set_expr {
 set_password_opt:
     FOR NAME {$$ = NULL} | {$$= NULL};
 
-set_expr: show_opt USERVAR COMPARISON expr { if ($3 != 4) yyerror("bad set to @%s", $2);
-        debug("SET %s", $2);
+set_opt_expr: expr {
+        $$= $1;
+    } | BINARY {
         Item *i = calloc(1, sizeof(*i));
-        i->name = strdup($2);
-        free($2);
-        i->token1 = USERVAR;
-        i->token2 = $1;
+        i->token1 = NAME;
+        i->name = strdup("BINARY");
+        $$ = i;
+    } | NULLX {
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = NAME;
+        i->name = strdup("NULL");
+        $$ = i;
+    };
+
+set_expr: set_opt COMPARISON set_opt_expr { if ($2 != 4) yyerror("bad set to @%s", $2);
+        debug("SET expr ");
 
         Item *c = calloc(1, sizeof(*c));
         c->token1 = COMPARISON;
-        c->token2 = $3;
-        c->left = i;
-        c->right = $4;
+        c->token2 = $2;
+        c->left = $1;
+        c->right = $3;
 
         $$ = c;
-    } | show_opt USERVAR ASSIGN expr {
-        debug("SET %s", $2);
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup($2);
-        free($2);
-        i->token1 = USERVAR;
-        i->token2 = $1;
+    } | set_opt ASSIGN expr {
+        debug("SET %s", $3);
 
         Item *c = calloc(1, sizeof(*c));
         c->token1 = ASSIGN;
-        c->left = i;
-        c->right = $4;
-
-        $$ = c;
-    } | show_opt NAME COMPARISON expr { debug ("SET %s", $2);
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup($2);
-        free($2);
-        i->token1 = NAME;
-        i->token2 = $1;
-
-        Item *c = calloc(1, sizeof(*c));
-        c->token1 = COMPARISON;
-        c->token2 = $3;
-        c->left = i;
-        c->right = $4;
-
-        $$ = c;
-    } | show_opt NAME COMPARISON set_misc_key_opt {
-        debug ("SET %s=binary", $1);
-        Item *i = calloc(1, sizeof(*i));
-        i->name = strdup($2);
-        free($2);
-        i->token1 = NAME;
-        i->token2 = $1;
-
-        Item *c = calloc(1, sizeof(*c));
-        c->token1 = COMPARISON;
-        c->token2 = $3;
-        c->left = i;
-
-        Item *r = calloc(1, sizeof(*r));
-        r->token1 = NAME;
-        r->name = strdup($4);
-
-        c->right = r;
+        c->left = $1;
+        c->right = $3;
 
         $$ = c;
     }
     ;
-    /* x=y y possible keywords */
-set_misc_key_opt:
-    BINARY { $$="binary";}
-    | DEFAULT { $$ = "default";}
-    | NULLX { $$ = "null"; }
 
     /* -EXPR */
 
@@ -1798,7 +1798,7 @@ expr: NAME { debug("NAME %s", $1);
             free($1);
             i->token1 = NAME;
             $$ = i;
-        }
+    }
    | USERVAR { debug("USERVAR %s", $1);
             Item *i = calloc(1, sizeof(*i));
             i->name = strdup($1);
@@ -1839,8 +1839,7 @@ expr: NAME { debug("NAME %s", $1);
             i->intNum = $1;
             i->token1 = BOOL;
             $$ = i;
-        }
-   ;
+    };
 
 expr: expr '+' expr { debug("ADD"); 
             Item *i = calloc(1, sizeof(*i));
@@ -1929,7 +1928,8 @@ expr: expr '+' expr { debug("ADD");
    }
    | expr COMPARISON ANY '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    /* TODO */
-   | expr COMPARISON SOME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
+/*    | expr COMPARISON SOME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); } */
+   | expr COMPARISON NAME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    | expr COMPARISON ALL '(' select_stmt ')' { debug("CMPALLSELECT %d", $2); }
    | expr '|' expr { debug("BITOR"); 
         Item *i = calloc(1, sizeof(*i));
@@ -2053,7 +2053,6 @@ opt_val_list: /* nil */ { $$ = NULL; }
    ;
 
 expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4); 
-        /* TODO */
         Item *i = calloc(1, sizeof(*i));
         i->token1 = IN;
         i->left = $1;
@@ -2070,7 +2069,6 @@ expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4);
    }
    | expr IN '(' select_stmt ')'     { 
         debug("INSELECT From child %p to father %p", curStmt, curStmt->father); 
-        /* TODO difer with val_list */ 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = IN;
         i->token2 = SELECT;
@@ -2081,7 +2079,6 @@ expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4);
    }
    | expr NOT IN '(' select_stmt ')' {
         debug("NOTINSELECT From child %p to father %p", curStmt, curStmt->father); 
-        /* TODO difer with val_list */ 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = NOT;
         i->token1 = SELECT;
@@ -2091,7 +2088,6 @@ expr: expr IN '(' val_list ')'       { debug("ISIN %d", $4);
         $$ = i;
    }
    | EXISTS '(' select_stmt ')'      { debug("EXISTS"); if($1) debug("NOT"); 
-        /* TODO difer with val_list */ 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = EXISTS;
         i->right = NULL;
@@ -2131,6 +2127,7 @@ expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
     | FASCII '(' val_list ')' { NORMAL_FUNCTION(FASCII); }
     /* TODO avg(distinct expr) */
     | FAVG '(' val_list ')' { NORMAL_FUNCTION(FAVG); }
+    | FAVG '(' DISTINCT val_list ')' { NORMAL_FUNCTION_DISTINCT(FAVG); }
     /*| FADDDATE '(' val_list ')' { NORMAL_FUNCTION(FADDDATE); }*/
     | FADDDATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FADDDATE); }
     /*| FBENCHMARK '(' val_list ')' { NORMAL_FUNCTION(FBENCHMARK); }*/
@@ -2162,9 +2159,8 @@ expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
     | FCOT '(' val_list ')' { NORMAL_FUNCTION(FCOT); }
     | FCRC32 '(' val_list ')' { NORMAL_FUNCTION(FCRC32); }
     | FCROSSESS '(' val_list ')' { NORMAL_FUNCTION(FCROSSESS); }
-    /* TODO count(distinct expr, expr)*/
-    /* TODO count(distinct) */
     | FCOUNT '(' val_list ')' { NORMAL_FUNCTION(FCOUNT); }
+    | FCOUNT '(' DISTINCT val_list ')' { NORMAL_FUNCTION_DISTINCT(FCOUNT); }
     | FCOUNT '(' '*' ')' { NORMAL_FUNCTION_WILD(FCOUNT); }
     | FCHARSET '(' val_list ')' { NORMAL_FUNCTION(FCHARSET); }
     | FCOLLATION '(' val_list ')' { NORMAL_FUNCTION(FCOLLATION); }
@@ -2401,7 +2397,7 @@ expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
     /*| FSUBDATE '(' val_list ')' { NORMAL_FUNCTION(FSUBDATE); }*/
     | FSUBDATE '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FSUBDATE); }
     | FSUM '(' val_list ')' { NORMAL_FUNCTION(FSUM); }
-    | FSUM'(' '*' ')' { NORMAL_FUNCTION_WILD(FSUM); }
+    | FSUM '(' DISTINCT val_list ')' { NORMAL_FUNCTION_DISTINCT(FSUM); }
     | FSYSDATE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSYSDATE); }
     | FSYSTEM_USER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FSYSTEM_USER); }
     | FTAN '(' val_list ')' { NORMAL_FUNCTION(FTAN); }
@@ -2474,13 +2470,13 @@ interval_exp: INTERVAL expr DAY_HOUR { debug("NUMBER 1"); }
    | INTERVAL expr DAY_MINUTE { debug("NUMBER 3"); }
    | INTERVAL expr DAY_SECOND { debug("NUMBER 4"); }
    | INTERVAL expr YEAR_MONTH { debug("NUMBER 5"); }
-   | INTERVAL expr YEAR       { debug("NUMBER 6"); }
+   | INTERVAL expr NAME { debug("NUMBER 6"); }
    | INTERVAL expr HOUR_MICROSECOND { debug("NUMBER 7"); }
    | INTERVAL expr HOUR_MINUTE { debug("NUMBER 8"); }
    | INTERVAL expr HOUR_SECOND { debug("NUMBER 9"); }
    ;
 
-expr: CASE expr case_list END               {
+expr: CASE expr case_list NAME {
     debug("CASE");
     Item *c = calloc(1, sizeof(*c));
     c->token1 = CASE;
@@ -2488,7 +2484,7 @@ expr: CASE expr case_list END               {
     c->next = $3;
     $$ = c;
 
-    } |  CASE expr case_list ELSE expr END  {
+    } |  CASE expr case_list ELSE expr NAME {
     debug("CASE ELSE");
     Item *c = calloc(1, sizeof(*c));
     c->token1 = CASE;
@@ -2498,14 +2494,14 @@ expr: CASE expr case_list END               {
     c->next = $3;
     $$ = c;
 
-    } |  CASE case_list END                 {
+    } |  CASE case_list NAME {
     debug("CASE ");
     Item *c = calloc(1, sizeof(*c));
     c->token1 = CASE;
     c->next = $2;
     $$ = c;
     
-    } |  CASE case_list ELSE expr END       {
+    } |  CASE case_list ELSE expr NAME {
     debug("CASE ELSE");
     Item *c = calloc(1, sizeof(*c));
     c->token1 = CASE;

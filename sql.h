@@ -55,9 +55,8 @@ enum enum_sql_command {
   SQLCOM_SHOW_CREATE_TRIGGER,
   SQLCOM_ALTER_DB_UPGRADE,
   SQLCOM_SHOW_PROFILE, SQLCOM_SHOW_PROFILES,
-  /*rry start*/
-  SQLCOM_SHOW_DISK_USAGE,
-  /*rry end*/
+  /* append */
+  SQLCOM_USE,
   /*
     When a command is added here, be sure it's also added in mysqld.cc
     in "struct show_var_st status_vars[]= {" ...
@@ -132,6 +131,9 @@ typedef struct Stmt_t {
     /*show*/
     Item *show;
 
+    /*use */
+    Item *use;
+
 	struct Stmt_t *father;
 } Stmt;
 
@@ -143,3 +145,8 @@ typedef struct Table_t {
 } Table;
 
 void stmtInit(Stmt*);
+
+
+#define GLOBAL 1
+#define SESSION 2
+
