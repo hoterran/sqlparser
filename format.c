@@ -154,8 +154,12 @@ void print_expr_item(Item *i, int indent) {
         } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
             zprintf(indent, FUNCNAME(i->token1)); 
             zprintf(0,"("); 
+
             if (i->right) {
-                print_list(i->right, 0);
+                if (i->token2 == UNIQUE) {
+                    print_expr_item(i->right, 0);
+                } else 
+                    print_list(i->right, 0);
             }
             if (i->name)
                 zprintf(0,"%s", i->name); 
@@ -178,6 +182,12 @@ void print_expr_item(Item *i, int indent) {
         } else if ((i->token1 == COMPARISON)) {
             print_expr_item(i->left, indent);
             printf(" %s ", tmp(i->token2));
+            print_expr_item(i->right, 0);
+        } else if ((i->token1 == LIKE) || (i->token1 == REGEXP)) {
+            print_expr_item(i->left, indent);
+            if (i->token2)
+                printf(" %s ", tmp(i->token2));
+            printf(" %s ", tmp(i->token1));
             print_expr_item(i->right, 0);
         } else if ((i->token1 == CASE)) {
             zprintf(indent, "CASE ");

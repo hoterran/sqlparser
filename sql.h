@@ -107,6 +107,7 @@ typedef struct Stmt_t {
 	list *select_expr_list;
 	/* table */
 	list *joinList;
+    list *joinIndexList;
 	enum SqlStep step;
 	list *groupList;
     list *havingList;

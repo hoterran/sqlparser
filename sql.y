@@ -24,6 +24,15 @@ void debug(char *s, ...);
         (yyval.item) = i;}\
         while(0)
 
+#define NORMAL_FUNCTION_ONE_PARAM(f) do {\
+        debug ("CALL %s", #f);\
+        Item *i = calloc(1, sizeof(*i));\
+        i->token1 = f;\
+        i->token2 = UNIQUE;\
+        i->right = (yyvsp[(3) - (4)].item);\
+        (yyval.item) = i;}\
+        while(0)
+
 #define NORMAL_FUNCTION_DISTINCT(f) do {\
         debug ("CALL %s", #f);\
         Item *i = calloc(1, sizeof(*i));\
@@ -633,13 +642,13 @@ void debug(char *s, ...);
 %type <stmt> select_stmt
 %type <intval> show_stmt set_stmt SHOWVARIABLES
 %type <stmt> table_subquery
-%type <listval> val_list opt_val_list case_list
+%type <listval> val_list opt_val_list case_list index_list
 %type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr expr_or_null_default name_or_default
 %type <intval> select_opts select_expr_list  set_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
 %type <intval> left_or_right opt_left_or_right_outer column_list
-%type <intval> index_list opt_for_join 
+%type <intval> opt_for_join 
 %type <strval> opt_as_alias
 
 %type <intval> delete_opts delete_list
@@ -955,22 +964,62 @@ join_condition:
     ;
 
 index_hint:
-     USE KEY opt_for_join '(' index_list ')'
-                  { debug("INDEXHINT %d %d", $5, 010+$3); }
-   | IGNORE KEY opt_for_join '(' index_list ')'
-                  { debug("INDEXHINT %d %d", $5, 020+$3); }
-   | FORCE KEY opt_for_join '(' index_list ')'
-                  { debug("INDEXHINT %d %d", $5, 030+$3); }
-   | /* nil */
-   ;
+     USE KEY opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 010+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = USE;
+        i->token2 = KEY;
+        i->right = $5;
+    } | IGNORE KEY opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 020+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = IGNORE;
+        i->token2 = KEY;
+        i->right = $5;
+    } | FORCE KEY opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 030+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FORCE;
+        i->token2 = KEY;
+        i->right = $5;
+    } | USE INDEX opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 010+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = USE;
+        i->token2 = INDEX;
+        i->right = $5;
+    } | IGNORE INDEX opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 020+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = IGNORE;
+        i->token2 = INDEX;
+        i->right = $5;
+    } | FORCE INDEX opt_for_join '(' index_list ')' {
+        debug("INDEXHINT %d %d", $5, 030+$3); 
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FORCE;
+        i->token2 = INDEX;
+        i->right = $5;
+    } | /* nil */
+    ;
 
-opt_for_join: FOR JOIN { $$ = 1; }
+opt_for_join: FOR JOIN { $$ = 1; /* TODO what this ?*/}
    | /* nil */ { $$ = 0; }
    ;
 
-index_list: NAME  { debug("INDEX %s", $1); free($1); $$ = 1; }
-    | index_list ',' NAME { debug("INDEX %s", $3); free($3); $$ = $1 + 1; }
-    ;
+index_list: NAME  { debug("INDEX %s", $1);
+        list *l = listCreate();
+        char *s = strdup($1);
+        free($1);
+        listAddNodeTail(l, s);
+        $$ = l;
+    }
+    | index_list ',' NAME { debug("INDEX %s", $3);
+        char *s = strdup($3);
+        listAddNodeTail($1, s);
+        free($3);
+        $$ = $1;
+    };
 
 table_subquery: '(' select_stmt ')' { 
         debug("SUBQUERY From child %p to father %p", curStmt, curStmt->father); 
@@ -2187,9 +2236,10 @@ expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
     | FCOT '(' val_list ')' { NORMAL_FUNCTION(FCOT); }
     | FCRC32 '(' val_list ')' { NORMAL_FUNCTION(FCRC32); }
     | FCROSSESS '(' val_list ')' { NORMAL_FUNCTION(FCROSSESS); }
-    | FCOUNT '(' val_list ')' { NORMAL_FUNCTION(FCOUNT); }
+    /*| FCOUNT '(' val_list ')' { NORMAL_FUNCTION(FCOUNT); }*/
     | FCOUNT '(' DISTINCT val_list ')' { NORMAL_FUNCTION_DISTINCT(FCOUNT); }
     | FCOUNT '(' '*' ')' { NORMAL_FUNCTION_WILD(FCOUNT); }
+    | FCOUNT '(' expr ')' { NORMAL_FUNCTION_ONE_PARAM(FCOUNT); }
     | FCHARSET '(' val_list ')' { NORMAL_FUNCTION(FCHARSET); }
     | FCOLLATION '(' val_list ')' { NORMAL_FUNCTION(FCOLLATION); }
     | FCURRENT_USER '(' ')' { NORMAL_FUNCTION_NO_PARAM(FCURRENT_USER); }

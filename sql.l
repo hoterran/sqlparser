@@ -98,7 +98,6 @@ EXISTS    { yylval.subtok = 0; return EXISTS; }
 NOT[ \t\n]+EXISTS    { yylval.subtok = 1; return EXISTS; }
 EXIT    { return EXIT; }
 EXPLAIN    { return EXPLAIN; }
-FALSE    { return FALSE; }
 FETCH    { return FETCH; }
 FLOAT[4|8]?    { return FLOAT; }
 FOR    { return FOR; }
@@ -247,7 +246,6 @@ TINYTEXT    { return TINYTEXT; }
 TO    { return TO; }
 TRAILING    { return TRAILING; }
 TRIGGER    { return TRIGGER; }
-TRUE { return TRUE; }
 UNDO    { return UNDO; }
 UNION    { return UNION; }
 UNIQUE    { return UNIQUE; }
