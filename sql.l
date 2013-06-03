@@ -259,7 +259,8 @@ UTC_DATE    { return UTC_DATE; }
 UTC_TIME    { return UTC_TIME; }
 UTC_TIMESTAMP    { return UTC_TIMESTAMP; }
     /* VARIABLES { return VARIABLES; } */
-VALUES    { return VALUES; }
+    /* values or value */
+VALUES?[ \t\n]?/"("   { return VALUES; }
 VARBINARY    { return VARBINARY; }
 VARCHAR(ACTER)?    { return VARCHAR; }
 VARYING    { return VARYING; }
