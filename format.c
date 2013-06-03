@@ -50,6 +50,48 @@ char* tmp(int cmp) {
         return "WHEN";
     else if (cmp == THEN) 
         return "THEN";
+    else if (cmp == INTERVAL) 
+        return "INTERVAL";
+    else if (cmp == DAY_HOUR) 
+        return "DAY_HOUR";
+    else if (cmp == DAY_MICROSECOND) 
+        return "DAY_MICROSECOND";
+    else if (cmp == DAY_MINUTE) 
+        return "DAY_MINUTE";
+    else if (cmp == DAY_SECOND) 
+        return "DAY_SECOND";
+    else if (cmp == YEAR_MONTH) 
+        return "YEAR_MONTH";
+    else if (cmp ==  SECOND_MICROSECOND) 
+        return "HOUR_MICROSECOND";
+    else if (cmp ==  MINUTE_MICROSECOND) 
+        return "HOUR_MINUTE";
+    else if (cmp ==  MINUTE_SECOND) 
+        return "HOUR_SECOND";
+    else if (cmp ==  HOUR_MICROSECOND) 
+        return "HOUR_MICROSECOND";
+    else if (cmp ==  HOUR_MINUTE) 
+        return "HOUR_MINUTE";
+    else if (cmp ==  HOUR_SECOND) 
+        return "HOUR_SECOND";
+    else if (cmp == MICROSECOND) 
+        return "MICROSECOND";
+    else if (cmp == SECOND) 
+        return "SECOND";
+    else if (cmp == MINUTE) 
+        return "MINUTE";
+    else if (cmp == HOUR) 
+        return "HOUR";
+    else if (cmp == DAY) 
+        return "DAY";
+    else if (cmp == WEEK) 
+        return "WEEK";
+    else if (cmp == MONTH) 
+        return "MONTH";
+    else if (cmp == QUARTER) 
+        return "QUARTER";
+    else if (cmp == YEAR) 
+        return "YEAR";
     else
         assert(NULL);
 }
@@ -214,6 +256,10 @@ void print_expr_item(Item *i, int indent) {
         } else if ((i->token1 == THEN)) {
             printf(" %s ", tmp(i->token1));
             print_expr_item(i->left, 0);
+        } else if ((i->token1 == INTERVAL)) {
+            printf(" %s ", tmp(i->token1));
+            print_expr_item(i->left, 0);
+            printf(" %s ", tmp(i->token2));
         } else {
             printf("%d - %d", i->token1, i->token2); 
             assert(NULL); 
@@ -591,6 +637,8 @@ void set(Stmt *stmt, int indent) {
     listIter *iter, *auxIter;
     listNode *node, *auxNode;
 
+    zprintf(indent,"SET\n");
+
     if (stmt->setList && listLength(stmt->setList)) {
         iter = listGetIterator(stmt->setList, AL_START_HEAD);
         indent++;
@@ -783,7 +831,6 @@ void stmt(Stmt *stmt, int indent) {
             limit(stmt, indent);
             break;
         case SQLCOM_SET_OPTION:
-            zprintf(indent,"SET\n");
             set(stmt, indent);
             break;
         case SQLCOM_UPDATE:
@@ -804,12 +851,14 @@ void stmt(Stmt *stmt, int indent) {
             table(stmt, indent);
             insertColumn(stmt, indent);
             valueColumn(stmt, indent);
+            set(stmt, indent);
             break;
         case SQLCOM_REPLACE:
             zprintf(indent,"REPLACE INTO\n");
             table(stmt, indent);
             insertColumn(stmt, indent);
             valueColumn(stmt, indent);
+            set(stmt, indent);
             break; 
         default:
             break;

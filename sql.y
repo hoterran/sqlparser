@@ -643,8 +643,8 @@ void debug(char *s, ...);
 %type <intval> show_stmt set_stmt SHOWVARIABLES
 %type <stmt> table_subquery
 %type <listval> val_list opt_val_list case_list index_list
-%type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr expr_or_null_default name_or_default
-%type <intval> select_opts select_expr_list  set_list
+%type <item> expr select_expr set_expr set_password_opt set_opt set_opt_expr expr_or_null_default name_or_default interval_exp
+%type <intval> select_opts select_expr_list  set_list insert_asgn_list
 %type <intval> groupby_list orderby_list opt_with_rollup opt_asc_desc
 %type <intval> table_references opt_inner_cross opt_outer table_factor
 %type <intval> left_or_right opt_left_or_right_outer column_list
@@ -653,7 +653,7 @@ void debug(char *s, ...);
 
 %type <intval> delete_opts delete_list
 %type <intval> insert_opts insert_vals insert_vals_list
-%type <intval> insert_asgn_list opt_if_not_exists update_opts update_asgn_list
+%type <intval>  opt_if_not_exists update_opts update_asgn_list
 %type <intval> opt_temporary opt_length opt_binary opt_uz enum_list
 %type <intval> column_atts data_type opt_ignore_replace create_col_list
 
@@ -1179,12 +1179,28 @@ insert_vals:  expr_or_null_default {
         listAddNodeTail(curStmt->valueChildList, $3);
     };
 
-    /* what is it? */
+    /* insert into tbname set x=1, y=2 */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME
     SET insert_asgn_list
-    opt_ondupupdate
-    { debug("INSERTASGN %d %d %s", $2, $6, $4); free($4) }
-    ;
+    opt_ondupupdate {
+        debug("INSERTASGN %d %d %s", $2, $6, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->name = strdup($4);
+        listAddNodeTail(curStmt->joinList, t);
+        free($4);
+    };
+
+insert_stmt: insert_reduce_stmt insert_opts opt_into NAME '.' NAME
+    SET insert_asgn_list
+    opt_ondupupdate {
+        debug("INSERTASGN %d %d %s", $2, $6, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($4);
+        t->name = strdup($6);
+        listAddNodeTail(curStmt->joinList, t);
+        free($4);
+        free($6);
+    };
 
     /* insert ... select */
 insert_stmt: insert_reduce_stmt insert_opts opt_into NAME opt_col_names
@@ -1214,18 +1230,21 @@ insert_stmt: insert_reduce_stmt insert_opts opt_into NAME '.' NAME opt_col_names
     };
 
 insert_asgn_list:
+    set_list 
+    /*
      NAME COMPARISON expr 
      { if ($2 != 4) yyerror("bad insert assignment to %s", $1);
        debug("ASSIGN %s", $1); free($1); $$ = 1; }
    | NAME COMPARISON DEFAULT
-               { if ($2 != 4) yyerror("bad insert assignment to %s", $1);
-                 debug("DEFAULT"); debug("ASSIGN %s", $1); free($1); $$ = 1; }
+       { if ($2 != 4) yyerror("bad insert assignment to %s", $1);
+         debug("DEFAULT"); debug("ASSIGN %s", $1); free($1); $$ = 1; }
    | insert_asgn_list ',' NAME COMPARISON expr
                { if ($4 != 4) yyerror("bad insert assignment to %s", $1);
                  debug("ASSIGN %s", $3); free($3); $$ = $1 + 1; }
    | insert_asgn_list ',' NAME COMPARISON DEFAULT
                { if ($4 != 4) yyerror("bad insert assignment to %s", $1);
                  debug("DEFAULT"); debug("ASSIGN %s", $3); free($3); $$ = $1 + 1; }
+    */
    ;
 
    /** replace just like insert **/
@@ -1262,9 +1281,25 @@ replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
 
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
     SET insert_asgn_list
-    opt_ondupupdate
-     { debug("REPLACEASGN %d %d %s", $2, $6, $4); free($4) }
-   ;
+    opt_ondupupdate {
+        debug("REPLACEASGN %d %d %s", $2, $6, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($4);
+        listAddNodeTail(curStmt->joinList, t);
+        free($4);
+    };
+
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME '.' NAME
+    SET insert_asgn_list
+    opt_ondupupdate {
+        debug("REPLACEASGN %d %d %s", $2, $6, $4);
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($4);
+        t->name = strdup($6);
+        listAddNodeTail(curStmt->joinList, t);
+        free($4);
+        free($6);
+    };
 
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME opt_col_names
     select_stmt
@@ -1924,86 +1959,92 @@ expr: expr '+' expr { debug("ADD");
             i->left = $1;
             i->right = $3;
             $$ = i;
-    }
-   | expr '-' expr { debug("SUB"); 
+    } | expr '+' interval_exp { debug("INTERVAL ADD"); 
+            Item *i = calloc(1, sizeof(*i));
+            i->token1 = ADD_OP;
+            i->left = $1;
+            i->right = $3;
+            $$ = i;
+    } | expr '-' interval_exp { debug("INTERVAL SUB "); 
+            Item *i = calloc(1, sizeof(*i));
+            i->token1 = SUB_OP;
+            i->left = $1;
+            i->right = $3;
+            $$ = i;
+    } | interval_exp '+' expr { debug("INTERVAL ADD"); 
+            Item *i = calloc(1, sizeof(*i));
+            i->token1 = ADD_OP;
+            i->left = $1;
+            i->right = $3;
+            $$ = i;
+    } | expr '-' expr { debug("SUB"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = SUB_OP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr '*' expr { debug("MUL"); 
+    } | expr '*' expr { debug("MUL"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = MUL_OP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr '/' expr { debug("DIV"); 
+   } | expr '/' expr { debug("DIV"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = DIV_OP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr '%' expr { debug("MOD"); 
+   } | expr '%' expr { debug("MOD"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = MOD;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr MOD expr { debug("MOD"); 
+   } | expr MOD expr { debug("MOD"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = MOD;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | '-' expr %prec UMINUS { debug("NEG"); 
+   } | '-' expr %prec UMINUS { debug("NEG"); 
         /*TODO*/ 
         Item *i = calloc(1, sizeof(*i));
         i->left = $2;
         $$ = i;
-   }
-   | expr ANDOP expr { debug("AND"); 
+   } | expr ANDOP expr { debug("AND"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = ANDOP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   } 
-   | expr OR expr { debug("OR"); 
+   } | expr OR expr { debug("OR"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = OR;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr XOR expr { debug("XOR"); 
+   } | expr XOR expr { debug("XOR"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = XOR;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr COMPARISON expr { debug("CMP %d ", $2);
+   } | expr COMPARISON expr { debug("CMP %d ", $2);
         Item *i = calloc(1, sizeof(*i));
         i->token1 = COMPARISON;
         i->token2 = $2;
         i->left = $1;
         i->right = $3;
         $$ = i;
-    }
-   | expr COMPARISON '(' select_stmt ')' { debug("CMPSELECT %d", $2); 
+    } | expr COMPARISON '(' select_stmt ')' { debug("CMPSELECT %d", $2); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = COMPARISON;
         i->token2 = $2;
         i->left = $1;
         i->next = $4;
         $$ = i;
-   }
-   | expr COMPARISON ANY '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
+   } | expr COMPARISON ANY '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
    /* TODO */
 /*    | expr COMPARISON SOME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); } */
    | expr COMPARISON NAME '(' select_stmt ')' { debug("CMPANYSELECT %d", $2); }
@@ -2014,48 +2055,41 @@ expr: expr '+' expr { debug("ADD");
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr '&' expr { debug("BITAND");
+   } | expr '&' expr { debug("BITAND");
         Item *i = calloc(1, sizeof(*i));
         i->token1 = BITAND_OP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr '^' expr { debug("BITXOR"); 
+   } | expr '^' expr { debug("BITXOR"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = BITXOR_OP;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | expr SHIFT expr { debug("SHIFT %s", $2==1?"left":"right"); 
+   } | expr SHIFT expr { debug("SHIFT %s", $2==1?"left":"right"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = SHIFT;
         i->left = $1;
         i->right = $3;
         $$ = i;
-   }
-   | NOT expr { debug("NOT"); 
+   } | NOT expr { debug("NOT"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = NOT;
         i->left = $2;
         $$ = i;
-   }
-   | '!' expr { debug("NOT"); 
+   } | '!' expr { debug("NOT"); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = NOT;
         i->left = $2;
         $$ = i;
-   }
-   | USERVAR ASSIGN expr { debug("ASSIGN @%s", $1); free($1); 
+   } | USERVAR ASSIGN expr { debug("ASSIGN @%s", $1); free($1); 
         Item *i = calloc(1, sizeof(*i));
         i->token1 = ASSIGN;
         i->name = strdup($1);
         i->right = $3;
         $$ = i;
-   }
-   | '(' expr ')' {
+   } | '(' expr ')' {
         $$ = $2; 
    }
    ;
@@ -2256,9 +2290,9 @@ expr: FABS '(' val_list ')' { NORMAL_FUNCTION(FABS); }
     | FDATEOFWEEK '(' val_list ')' { NORMAL_FUNCTION(FDATEOFWEEK); }
     | FDATEOFYEAR '(' val_list ')' { NORMAL_FUNCTION(FDATEOFYEAR); }
     /*| FDATE_ADD '(' val_list ')' { NORMAL_FUNCTION(FDATE_ADD); }*/
-    | FDATE_ADD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_ADD); }
+/*    | FDATE_ADD '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_ADD); } */
     /*| FDATE_SUB '(' val_list ')' { NORMAL_FUNCTION(FDATE_SUB); }*/
-    | FDATE_SUB '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_SUB); }
+    /*| FDATE_SUB '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_SUB); } */
     /*| FDATE_FORMAT '(' val_list ')' { NORMAL_FUNCTION(FDATE_FORMAT); }*/
     | FDATE_FORMAT '(' val_list ')' { NORMAL_FUNCTION_ANY_PARAM(FDATE_FORMAT); }
     | FDATABASE '(' ')' { NORMAL_FUNCTION_NO_PARAM(FDATABASE); }
@@ -2539,20 +2573,154 @@ trim_ltb: LEADING { debug("INT 1"); }
    | BOTH { debug("INT 3"); }
    ;
 
-expr: FDATE_ADD '(' expr ',' interval_exp ')' { debug("CALL 3 DATE_ADD"); }
-   |  FDATE_SUB '(' expr ',' interval_exp ')' { debug("CALL 3 DATE_SUB"); }
-   ;
+expr: FDATE_ADD '(' expr ',' interval_exp ')' {
+        debug("CALL 3 DATE_ADD"); 
+        list *l = listCreate();
+        listAddNodeTail(l, $3);
+        listAddNodeTail(l, $5);
 
-interval_exp: INTERVAL expr DAY_HOUR { debug("NUMBER 1"); }
-   | INTERVAL expr DAY_MICROSECOND { debug("NUMBER 2"); }
-   | INTERVAL expr DAY_MINUTE { debug("NUMBER 3"); }
-   | INTERVAL expr DAY_SECOND { debug("NUMBER 4"); }
-   | INTERVAL expr YEAR_MONTH { debug("NUMBER 5"); }
-   | INTERVAL expr NAME { debug("NUMBER 6"); }
-   | INTERVAL expr HOUR_MICROSECOND { debug("NUMBER 7"); }
-   | INTERVAL expr HOUR_MINUTE { debug("NUMBER 8"); }
-   | INTERVAL expr HOUR_SECOND { debug("NUMBER 9"); }
-   ;
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FDATE_ADD;
+        i->right = l;
+        $$ = i;
+    }
+    | FDATE_SUB '(' expr ',' interval_exp ')' {
+        debug("CALL 3 DATE_SUB");
+        list *l = listCreate();
+        listAddNodeTail(l, $3);
+        listAddNodeTail(l, $5);
+
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = FDATE_SUB;
+        i->right = l;
+        $$ = i;
+    };
+
+interval_exp: INTERVAL expr DAY_HOUR {
+        debug("INTERVAL %s DAY_HOUR", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = DAY_HOUR;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr DAY_MICROSECOND {
+        debug("INTERVAL %s DAY_MICROSECOND", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = DAY_MICROSECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr DAY_MINUTE {
+        debug("INTERVAL %s DAY_MINUTE", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = DAY_MINUTE;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr DAY_SECOND {
+        debug("INTERVAL %s DAY_SECOND", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = DAY_SECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr YEAR_MONTH {
+        debug("INTERVAL %s YEAR_MONTH", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = YEAR_MONTH;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr NAME {
+        /* DAY not keyword*/
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->left = $2;
+
+        if ((strcasecmp($3, "day")) == 0) {
+            debug("INTERVAL %d day", $2->intNum);
+            i->token2 = DAY;
+            $$ = i;
+        } else if ((strcasecmp($3, "week")) == 0) {
+            debug("INTERVAL %d day", $2->intNum);
+            i->token2 = WEEK;
+            $$ = i;
+        } else if ((strcasecmp($3, "month")) == 0) {
+            debug("INTERVAL %d month", $2->intNum);
+            i->token2 = MONTH;
+            $$ = i;
+        } else if ((strcasecmp($3, "quarter")) == 0) {
+            debug("INTERVAL %d quarter", $2->intNum);
+            i->token2 = QUARTER;
+            $$ = i;
+        } else if ((strcasecmp($3, "year")) == 0) {
+            debug("INTERVAL %d year", $2->intNum);
+            i->token2 = YEAR;
+            $$ = i;
+        } else if ((strcasecmp($3, "microsecond")) == 0) {
+            debug("INTERVAL %d day", $2->intNum);
+            i->token2 = MICROSECOND;
+            $$ = i;
+        } else if ((strcasecmp($3, "second")) == 0) {
+            debug("INTERVAL %d month", $2->intNum);
+            i->token2 = SECOND;
+            $$ = i;
+        } else if ((strcasecmp($3, "minute")) == 0) {
+            debug("INTERVAL %d quarter", $2->intNum);
+            i->token2 = MINUTE;
+            $$ = i;
+        } else if ((strcasecmp($3, "hour")) == 0) {
+            debug("INTERVAL %d year", $2->intNum);
+            i->token2 = HOUR;
+            $$ = i;
+        } else {
+            yyerror("interval error %s", $3);
+            free($2);
+            free(i);
+        }
+    } | INTERVAL expr HOUR_MICROSECOND {
+        debug("INTERVAL %s HOUR_MICROSECOND", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = HOUR_MICROSECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr HOUR_MINUTE {
+        debug("INTERVAL %s HOUR_MINUTE", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = HOUR_MINUTE;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr HOUR_SECOND {
+        debug("INTERVAL %s HOUR_SECOND", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = HOUR_SECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr SECOND_MICROSECOND {
+        debug("INTERVAL %s SECOND_MICROSECOND ", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = SECOND_MICROSECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr MINUTE_MICROSECOND {
+        debug("INTERVAL %s MINUTE_MICROSECOND ", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = MINUTE_MICROSECOND;
+        i->left = $2;
+        $$ = i;
+    } | INTERVAL expr MINUTE_SECOND {
+        debug("INTERVAL %s MINUTE_SECOND ", $2->name);
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = INTERVAL;
+        i->token2 = MINUTE_SECOND;
+        i->left = $2;
+        $$ = i;
+    };
 
 expr: CASE expr case_list NAME {
     debug("CASE");

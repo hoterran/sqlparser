@@ -147,7 +147,17 @@ typedef struct Table_t {
 
 void stmtInit(Stmt*);
 
+/* token but not keyword in mysql */
 
-#define GLOBAL 1
-#define SESSION 2
+#define GLOBAL  100001
+#define SESSION 100002
+#define MICROSECOND 100003 
+#define SECOND 100003 
+#define MINUTE 100003 
+#define HOUR 100003 
+#define DAY 100003 
+#define WEEK 100003 
+#define MONTH 100003 
+#define QUARTER 100003 
+#define YEAR 100003 
 

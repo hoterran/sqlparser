@@ -629,7 +629,7 @@ SUM[ ]+    { int c = input(); unput(c);
 AUTO_INCREMENT|BIT|COMMENT|DATE|DATETIME|END|ENUM|GLOBAL|QUICK|READ_ONLY|READ_WRITE|ROLLUP|SESSION|SOME|TEMPORARY|TEXT|TIME|TIMESTAMP|YEAR|GLOBAL|SESSION { yylval.strval = strdup(yytext); return NAMESPEC1;}
     */
 
-[A-Za-z\?][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
+[A-Za-z][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
                           return NAME; }
 `[^`/\\.\n]+`           { yylval.strval = strdup(yytext+1);
                           yylval.strval[yyleng-2] = 0;
@@ -661,6 +661,8 @@ AUTO_INCREMENT|BIT|COMMENT|DATE|DATETIME|END|ENUM|GLOBAL|QUICK|READ_ONLY|READ_WR
 <COMMENT>"*/"   { BEGIN oldstate; }
 <COMMENT>.|\n   ;
 <COMMENT><<EOF>> { yyerror("unclosed comment"); }
+
+[\?]    { yylval.strval = strdup(yytext); return NAME; }
 
     /* everything else */
 [ \t\n]         /* white space and newline skip */
