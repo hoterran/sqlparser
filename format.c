@@ -637,10 +637,10 @@ void set(Stmt *stmt, int indent) {
     listIter *iter, *auxIter;
     listNode *node, *auxNode;
 
-    zprintf(indent,"SET\n");
 
     if (stmt->setList && listLength(stmt->setList)) {
         iter = listGetIterator(stmt->setList, AL_START_HEAD);
+        zprintf(indent,"SET\n");
         indent++;
         //zprintf(indent,"set(%d) => \n", listLength(stmt->setList));
         while ((node = listNext(iter)) != NULL) {
@@ -820,11 +820,18 @@ void stmt(Stmt *stmt, int indent) {
         case SQLCOM_SHOW_TABLES:
             zprintf(indent,"DESC ");
             print_expr_item(stmt->desc, 0);
+            printf("\n");
+            break;
+        case SQLCOM_TRUNCATE:
+            zprintf(indent,"TRUNCATE TABLE ");
+            print_expr_item(stmt->desc, 0);
+            printf("\n");
             break;
 
         case SQLCOM_SHOW_FIELDS:
             zprintf(indent,"DESC ");
             print_expr_item(stmt->desc, 0);
+            printf("\n");
             break;
 
         case SQLCOM_SELECT:

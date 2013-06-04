@@ -126,7 +126,7 @@ typedef struct Stmt_t {
     list *valueChildList;
     struct Stmt_t *valueSelect;
 
-    /*desc */
+    /*desc, truncate */
     Item *desc;
 
     /*show*/

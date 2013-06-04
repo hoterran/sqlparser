@@ -161,7 +161,6 @@ void debug(char *s, ...);
 %token DELAYED
 %token DELETE
 %token DESC
-%token DESCRIBE
 %token DETERMINISTIC
 %token DISTINCT
 %token DISTINCTROW
@@ -303,6 +302,7 @@ void debug(char *s, ...);
 %token TINYBLOB
 %token TINYINT
 %token TINYTEXT
+%token TRUNCATE
 %token TO
 %token TRAILING
 %token TRIGGER
@@ -1273,7 +1273,7 @@ replace_value_reduce_stmt: VALUES {
         curStmt->step = ValueColumnStep;
         curStmt->valueChildList = listCreate();
     };
-
+    /* replace into t() values () */
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
      opt_col_names
      replace_value_reduce_stmt insert_vals_list
@@ -1284,7 +1284,20 @@ replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
         free($4);
         listAddNodeTail(curStmt->joinList, t);
     };
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME '.' NAME
+     opt_col_names
+     replace_value_reduce_stmt insert_vals_list
+     opt_ondupupdate {
+        debug("REPLACEVALS %d %d %s", $2, $9, $6); 
+        Table *t = calloc(1, sizeof(*t));
+        t->db = strdup($4);
+        t->name = strdup($4);
+        free($4);
+        free($6);
+        listAddNodeTail(curStmt->joinList, t);
+    };
 
+    /* replace into t() set x=1, y=2 */
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
     SET insert_asgn_list
     opt_ondupupdate {
@@ -1295,6 +1308,7 @@ replace_stmt: replace_reduce_stmt insert_opts opt_into NAME
         free($4);
     };
 
+    /* replace into t.t() set x=1, y=2 */
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME '.' NAME
     SET insert_asgn_list
     opt_ondupupdate {
@@ -1307,6 +1321,7 @@ replace_stmt: replace_reduce_stmt insert_opts opt_into NAME '.' NAME
         free($6);
     };
 
+    /* replace into t.t() select ... */
 replace_stmt: replace_reduce_stmt insert_opts opt_into NAME opt_col_names
     select_stmt
     opt_ondupupdate {
@@ -1317,6 +1332,20 @@ replace_stmt: replace_reduce_stmt insert_opts opt_into NAME opt_col_names
         curStmt = curStmt->father;
         listAddNodeTail(curStmt->joinList, t);
         curStmt->valueSelect = $6;
+    };
+
+replace_stmt: replace_reduce_stmt insert_opts opt_into NAME '.' NAME opt_col_names
+    select_stmt
+    opt_ondupupdate {
+        debug("REPLACESELECT %d %s From child %p to father %p", $2, $4, curStmt, curStmt->father);
+        Table *t = calloc(1, sizeof(*t));
+        t->db= strdup($4);
+        t->name = strdup($6);
+        free($4);
+        free($6);
+        curStmt = curStmt->father;
+        listAddNodeTail(curStmt->joinList, t);
+        curStmt->valueSelect = $8;
     };
 
     /** -UPDATE **/
@@ -1721,6 +1750,46 @@ use_stmt: USE NAME {
         stmt->sql_command = SQLCOM_USE;
     }
 
+    /* TRUNCATE */
+stmt: truncate_stmt {debug("truncate");};
+
+truncate_stmt: TRUNCATE NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->name = strdup($2);
+        i->token1 = NAME;
+        free($2);
+        curStmt->desc = i;
+
+        stmt->sql_command = SQLCOM_TRUNCATE;
+
+    } | TRUNCATE NAME '.' NAME {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("desc From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        Item *i = calloc(1, sizeof(*i));
+        i->prefix = strdup($2);
+        i->name = strdup($4);
+        i->token1 = NAME;
+        free($2);
+        free($4);
+        curStmt->desc = i;
+
+        stmt->sql_command = SQLCOM_TRUNCATE;
+    }
+    
     /* DESC */
 stmt: desc_stmt { debug("STMT");}
     ;
@@ -1862,7 +1931,7 @@ set_stmt: set_reduce_stmt set_list {
         curStmt = stmt;
 
         curStmt->sql_command = SQLCOM_SET_OPTION;
-        debug("SET LIST PASSWORD ");
+        debug("SET OPTION ");
         Item *i = calloc(1, sizeof(*i));
         i->token1 = SETOPTION;
         i->name = strdup("OPTION"); 

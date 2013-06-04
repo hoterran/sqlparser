@@ -78,8 +78,7 @@ DECLARE    { return DECLARE; }
 DEFAULT    { return DEFAULT; }
 DELAYED    { return DELAYED; }
 DELETE    { return DELETE; }
-DESC    { return DESC; }
-DESCRIBE    { return DESCRIBE; }
+DESC(RIBE)?   { return DESC; }
 DETERMINISTIC    { return DETERMINISTIC; }
 DISTINCT    { return DISTINCT; }
 DISTINCTROW    { return DISTINCTROW; }
@@ -163,7 +162,8 @@ SET[ \t\n]+NAMES/[ \t\n]+   { return SETNAMES; }
 SET[ \t\n]+CHARACTER/[ \t\n]+ { return SETCHARACTER; }
 SET[ \t\n]+PASSWORD/[ \t\n]+ { return SETPASSWORD; }
     /* rds unoffical synatx, dont care */
-SET[ \t\n]+OPTION/[ \t\n]+ { return SETOPTION; }
+
+SET[ \t\n]+OPTION; ;
 
 SET[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+UNCOMMITTED {
         yylval.strval = strdup("TRANSACTION ISOLATION LEVEL READ UNCOMMITED");  return SETTRAN; 
@@ -670,13 +670,9 @@ SUM[ ]+    { int c = input(); unput(c);
            return NAME; }
     */
 
-    /*
-AUTO_INCREMENT|BIT|COMMENT|DATE|DATETIME|END|ENUM|GLOBAL|QUICK|READ_ONLY|READ_WRITE|ROLLUP|SESSION|SOME|TEMPORARY|TEXT|TIME|TIMESTAMP|YEAR|GLOBAL|SESSION { yylval.strval = strdup(yytext); return NAMESPEC1;}
-    */
-
 [A-Za-z][A-Za-z0-9_]*    { yylval.strval = strdup(yytext);
                           return NAME; }
-`[^`/\\.\n]+`           { yylval.strval = strdup(yytext+1);
+`[^`/\\\n]+`           { yylval.strval = strdup(yytext+1);
                           yylval.strval[yyleng-2] = 0;
                           return NAME; }
 
@@ -708,6 +704,15 @@ AUTO_INCREMENT|BIT|COMMENT|DATE|DATETIME|END|ENUM|GLOBAL|QUICK|READ_ONLY|READ_WR
 <COMMENT><<EOF>> { yyerror("unclosed comment"); }
 
 [\?]    { yylval.strval = strdup(yytext); return NAME; }
+
+    /* skip ping, rds special */
+^[ \t\n]*PING; ;
+^[ \t\n]*BEGIN; ;
+^[ \t\n]*ROLLBACK; ;
+^[ \t\n]*COMMIT; ;
+
+^[ \t\n]*truncate[ \t\n]+               {return TRUNCATE;};
+^[ \t\n]*truncate[ \t\n]+TABLE[ \t\n]+  {return TRUNCATE;};
 
     /* everything else */
 [ \t\n]         /* white space and newline skip */
