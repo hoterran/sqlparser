@@ -7,9 +7,13 @@
 #include <string.h>
 #include <stdio.h>
 
+extern Stmt *stmtArray[100];
+extern int indexArray;    
+
 typedef struct Tab {
     char *name;
     char *alias;
+    char *db;
     list *columns; // This table's columns
 } Tab;
 
@@ -20,23 +24,41 @@ void stmt(Stmt *st, int indent);
 void loop_expr_item(Item *i, list *tabs) {
     listNode *node;
     Tab *tab;
+    listIter *iter = NULL;
 
     if (!i) 
         { return; } 
     else {
+        if (!i->name)
+            return;
+
+        if (0 == strcmp("?", i->name))
+            return;
+
         if ((i->token1 == NAME) && (i->token2 == 0)) { 
-            if (i->prefix) {
-                node = listSearchKey(tabs, i->prefix);
-                if (!node) {
-                    printf("need prefix\n");
-                    return ;
-                }
+            if (listLength(tabs) == 1) {
+                iter = listGetIterator(tabs, AL_START_HEAD);                
+                node = listNext(iter);
                 tab = listNodeValue(node);
+                //printf("%s\n", i->name);
                 if(!listSearchKey(tab->columns, i->name)) {
                     listAddNodeTail(tab->columns, i->name);
                 }
             } else {
-                printf("need prefix\n");
+                if (i->prefix) {
+                    node = listSearchKey(tabs, i->prefix);
+                    if (!node) {
+                        printf("need prefix\n");
+                        return ;
+                    }
+                    tab = listNodeValue(node);
+                    //printf("%s\n", i->name);
+                    if(!listSearchKey(tab->columns, i->name)) {
+                        listAddNodeTail(tab->columns, i->name);
+                    }
+                } else {
+                    printf("need prefix\n");
+                }
             }
             /*
                 only use function
@@ -86,15 +108,21 @@ void loop_expr_stmt(Item *i, list *tabs) {
         } else if ((i->token1 == NULLX)) {
             return;
             /* skip */
+        } else if ((i->token1 == NAME)) {
+            return;
+            /* skip */
         } else if ((i->token1 == IN) && (i->token2 == SELECT)) {
             return;
             /* skip select */
         } else if ((i->token1 == IN) && (i->token2 == 0)) {
+            loop_expr_item(i->left, tabs);
             return;
-            /* in (1, 2, 3) */
-        } else if ((i->token1 == LIKE) || (i->token1 == REGEXP)
-        ) {
+        } else if ((i->token1 == NOT) && (i->token2 == IN)) {
             return;
+        } else if ((i->token1 == LIKE) || (i->token1 == REGEXP)) {
+            return;
+        } else if ((i->token1 > FSTART) && (i->token1 < FEND)) {
+            return ;
             /* skip */
         } else {
            assert(NULL); 
@@ -105,10 +133,10 @@ void loop_expr_stmt(Item *i, list *tabs) {
     create index Table_IndexName1_IndexName2_ind 
     on Table(indexName1, indexName2);
 */
-void generateIndex(char *table, list *columns) {
+void generateIndex(char *db, char *table, list *columns) {
     listIter *iter;
     listNode *node;
-    char s[128] = {};
+    char s[1000] = {};
 
     if (columns && listLength(columns)) {
         iter = listGetIterator(columns, AL_START_HEAD); 
@@ -120,7 +148,10 @@ void generateIndex(char *table, list *columns) {
         }
 
         listReleaseIterator(iter);
-        snprintf(s + strlen(s), sizeof(s), " on %s(", table);
+        if (db)
+            snprintf(s + strlen(s), sizeof(s), " on %s.%s(", db, table);
+        else
+            snprintf(s + strlen(s), sizeof(s), " on %s(", table);
 
         iter = listGetIterator(columns, AL_START_HEAD); 
         while ((node = listNext(iter)) != NULL) {
@@ -141,20 +172,6 @@ void generateIndex(char *table, list *columns) {
  *    tab1 t, tab2  -> t tab2
  */
 
-void stmtInit(Stmt *stmt) {
-    stmt->joinList = listCreate();
-    stmt->groupList = listCreate();
-    stmt->havingList = listCreate();
-    stmt->orderList = listCreate();
-    stmt->limitList = listCreate();
-    stmt->setList = listCreate();
-    stmt->updateSetList = listCreate();
-    stmt->select_expr_list = listCreate();
-    stmt->whereList = listCreate();
-    stmt->insertList = listCreate();
-    stmt->valueList  = listCreate();
-    stmt->usingList = listCreate();
-}
 int columnMatch(void *ptr, void *key) {
     char *user = (char*)key;
     char *column = (char*) ptr;
@@ -191,10 +208,13 @@ list *generateTable(Stmt *st) {
             tab->columns = listCreate(); 
             tab->columns->match = columnMatch;
             /* alias and name */
-            if (t->alias) {
+            if (t->alias)
                 tab->alias = strdup(t->alias);
-                tab->name = strdup(t->name);
-            } else
+
+            if (t->db)
+                tab->db = strdup(t->db);
+
+            if (t->name) 
                 tab->name = strdup(t->name);
 
             listAddNodeTail(tabs, tab);
@@ -227,37 +247,60 @@ void generateColumn(Stmt *st, list *tabs) {
 int main(int ac, char **av)
 {
     extern FILE *yyin;
-
-    if( ac > 1 && !strcmp(av[1], "-d")) {
+ 
+    if(ac > 1 && !strcmp(av[1], "-d")) {
          ac--; av++;
     }
-
-    if( ac > 1 && (yyin = fopen(av[1], "r")) == NULL) {
+ 
+    if(ac > 1 && (yyin = fopen(av[1], "r")) == NULL) {
         perror(av[1]);
         exit(1);
     }
-
-    if(yyparse()) {
-        printf("SQL parse failed\n");
-        return 1;
+ 
+    /* for big file */
+    yypush_buffer_state(yy_create_buffer( yyin, 1000000));
+    yyparse();
+ 
+    convert();
+    int i = 0, j = 0;
+    for (i = 0; i < indexArray; i++) {
+        if (stmtArray[i] == NULL)
+            j++;
     }
+    
+    printf("<<<<<<  This file has %d sql, success %d, failure %d >>>>>\n", indexArray, indexArray-j, j);
+ 
+    printf("\n-------------------------------------------------------------------------\n");
+    for (i = 0; i < indexArray; i++) {
+        Stmt *st = stmtArray[i];
+        if (st) {
+            if ((st->sql_command == SQLCOM_SELECT)
+            || (st->sql_command == SQLCOM_DELETE)
+            || (st->sql_command = SQLCOM_UPDATE)) {
+                stmt(st, 0); 
+                printf("=========================================================\n");
+                list *tabs = generateTable(st);
+                generateColumn(st, tabs);
 
-    Stmt *st = curStmt;
-    list *tabs = generateTable(st);
-    generateColumn(st, tabs);
+                listIter *iter;
+                listNode *node;
 
-    listIter *iter;
-    listNode *node;
-
-    if (tabs && listLength(tabs)) {
-        iter = listGetIterator(tabs, AL_START_HEAD); 
-        while ((node = listNext(iter)) != NULL) {
-            Tab *t = listNodeValue(node);
-            generateIndex(t->name, t->columns);
+                if (tabs && listLength(tabs)) {
+                    iter = listGetIterator(tabs, AL_START_HEAD); 
+                    while ((node = listNext(iter)) != NULL) {
+                        Tab *t = listNodeValue(node);
+                        generateIndex(t->db, t->name, t->columns);
+                    }
+                    
+                    listReleaseIterator(iter);
+                }
+                printf("=========================================================\n");
+            }
+        } else {
+            printf("SQL parse failed\n");
         }
-        
-        listReleaseIterator(iter);
-    }
+    } 
+
 
     return 0;
 } 

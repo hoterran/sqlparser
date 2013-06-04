@@ -8,15 +8,19 @@ all:format index format_str
 format:	sql.tab.o sql.o adlist.o format.o func.h
 	${CC} -o format format.o sql.tab.o sql.o adlist.o
 
+format.o:CFLAGS+= -D__FORMAT__
 format.o:format.c
+
+format2.o:format.c
+	gcc -g -c -o format2.o format.c
 
 format_str:	sql.tab.o sql.o adlist.o format_str.o
 	${CC} -o format_str format_str.o sql.tab.o sql.o adlist.o
 
 format_str.o: format_str.c
 
-index: sql.tab.o sql.o adlist.o index.o
-	${CC} -o index index.o sql.tab.o sql.o adlist.o
+index: sql.tab.o sql.o adlist.o index.o format2.o
+	${CC} -o index index.o sql.tab.o sql.o adlist.o format2.o
 
 index.o:index.c
 

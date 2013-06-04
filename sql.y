@@ -2940,10 +2940,11 @@ expr: BINARY expr %prec UMINUS { debug("STRTOBIN"); }
 void debug(char *s, ...) {
     va_list ap;
     va_start(ap, s);
-     
+    /* 
     printf("rpn: ");
     vfprintf(stdout, s, ap);
     printf("\n");
+    */
 }
 
 void yyerror(char *s, ...)

@@ -879,6 +879,8 @@ void stmt(Stmt *stmt, int indent) {
     }
 }
 
+#ifdef __FORMAT__
+
 int main(int ac, char **av)
 {
     extern FILE *yyin;
@@ -918,3 +920,5 @@ int main(int ac, char **av)
 
     return 0;
 } 
+
+#endif
