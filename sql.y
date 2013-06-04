@@ -277,7 +277,9 @@ void debug(char *s, ...);
 %token SET
 %token SETNAMES
 %token SETCHARACTER
+%token <strval> SETTRAN
 %token SETPASSWORD
+%token SETOPTION
 %token SHOW
 %token SHOWVARIABLES
 %token SHOWCOLLATION
@@ -1013,8 +1015,12 @@ index_list: NAME  { debug("INDEX %s", $1);
         free($1);
         listAddNodeTail(l, s);
         $$ = l;
-    }
-    | index_list ',' NAME { debug("INDEX %s", $3);
+    } | PRIMARY { debug("INDEX primary");
+        list *l = listCreate();
+        char *s = strdup("PRIMARY");
+        listAddNodeTail(l, s);
+        $$ = l;
+    } | index_list ',' NAME { debug("INDEX %s", $3);
         char *s = strdup($3);
         listAddNodeTail($1, s);
         free($3);
@@ -1845,6 +1851,38 @@ set_stmt: set_reduce_stmt set_list {
 
         listAddNodeTail(curStmt->setList, i); 
         listAddNodeTail(curStmt->setList, $3); 
+        $$ = 1;
+    } | SETOPTION {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SET LIST PASSWORD ");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETOPTION;
+        i->name = strdup("OPTION"); 
+        listAddNodeTail(curStmt->setList, i); 
+        $$ = 1;
+    } | SETTRAN {
+        Stmt *stmt = calloc(1, sizeof(*stmt));
+        stmtInit(stmt);
+        if (curStmt) {
+            stmt->father = curStmt;
+        }
+        debug("set From %p to child %p", curStmt, stmt);
+        curStmt = stmt;
+
+        curStmt->sql_command = SQLCOM_SET_OPTION;
+        debug("SETTRAN ");
+        Item *i = calloc(1, sizeof(*i));
+        i->token1 = SETOPTION;
+        i->name = $1; 
+        listAddNodeTail(curStmt->setList, i); 
         $$ = 1;
     };
 

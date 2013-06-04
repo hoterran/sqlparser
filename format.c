@@ -661,6 +661,12 @@ void set(Stmt *stmt, int indent) {
                 Item *i2 = listNodeValue(listNext(iter));
                 zprintf(indent, "%s", i2->name);
                 break;
+            } else if (i->token1 == SETOPTION) {
+                zprintf(indent, "%s", i->name);
+                break;
+            } else if (i->token1 == SETTRAN) {
+                zprintf(indent, "%s", i->name);
+                break;
             }
 
             if (i->token2 == GLOBAL)
@@ -674,6 +680,7 @@ void set(Stmt *stmt, int indent) {
             else
                 printf("\n");
         }
+        printf("\n");
         
         listReleaseIterator(iter);
         //listRelease(stmt->setList);

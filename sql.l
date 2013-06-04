@@ -158,9 +158,53 @@ MINUTE_SECOND    { return MINUTE_SECOND; }
 MOD    { return MOD; }
 MODIFIES    { return MODIFIES; }
 NATURAL    { return NATURAL; }
+
 SET[ \t\n]+NAMES/[ \t\n]+   { return SETNAMES; }
 SET[ \t\n]+CHARACTER/[ \t\n]+ { return SETCHARACTER; }
 SET[ \t\n]+PASSWORD/[ \t\n]+ { return SETPASSWORD; }
+    /* rds unoffical synatx, dont care */
+SET[ \t\n]+OPTION/[ \t\n]+ { return SETOPTION; }
+
+SET[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+UNCOMMITTED {
+        yylval.strval = strdup("TRANSACTION ISOLATION LEVEL READ UNCOMMITED");  return SETTRAN; 
+    }
+SET[ \t\n]+GLOBAL[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+UNCOMMITTED {
+        yylval.strval = strdup("GLOBAL TRANSACTION ISOLATION LEVEL READ UNCOMMITED");  return SETTRAN; 
+    }
+SET[ \t\n]+SESSION[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+UNCOMMITTED {
+        yylval.strval = strdup("SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITED");  return SETTRAN;
+    }
+
+SET[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+COMMITTED {
+        yylval.strval = strdup("TRANSACTION ISOLATION LEVEL READ COMMITED");  return SETTRAN; 
+    }
+SET[ \t\n]+GLOBAL[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+COMMITTED {
+        yylval.strval = strdup("GLOBAL TRANSACTION ISOLATION LEVEL READ COMMITED");  return SETTRAN; 
+    }
+SET[ \t\n]+SESSION[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+READ[ \t\n]+COMMITTED {
+        yylval.strval = strdup("SESSION TRANSACTION ISOLATION LEVEL READ COMMITED");  return SETTRAN;
+    }
+
+SET[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+REPEATABLE[ \t\n]+READ {
+        yylval.strval = strdup("TRANSACTION ISOLATION LEVEL REPEATABLE READ");  return SETTRAN; 
+    }
+SET[ \t\n]+GLOBAL[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+REPEATABLE[ \t\n]+READ {
+        yylval.strval = strdup("GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ");  return SETTRAN; 
+    }
+SET[ \t\n]+SESSION[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+REPEATABLE[ \t\n]+READ {
+        yylval.strval = strdup("SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ");  return SETTRAN;
+    }
+
+SET[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+SERIALIZABLE {
+        yylval.strval = strdup("TRANSACTION ISOLATION LEVEL SERIALIZABLE");  return SETTRAN; 
+    }
+SET[ \t\n]+GLOBAL[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+SERIALIZABLE {
+        yylval.strval = strdup("GLOBAL TRANSACTION ISOLATION LEVEL SERIALIZABLE");  return SETTRAN; 
+    }
+SET[ \t\n]+SESSION[ \t\n]+TRANSACTION[ \t\n]+ISOLATION[ \t\n]+LEVEL[ \t\n]+SERIALIZABLE {
+        yylval.strval = strdup("SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE");  return SETTRAN;
+    }
+
 NOT    { return NOT; }
 NO_WRITE_TO_BINLOG    { return NO_WRITE_TO_BINLOG; }
 NULL    { return NULLX; }
