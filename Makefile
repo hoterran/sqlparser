@@ -40,7 +40,7 @@ sql.c:	sql.l
 sql.o: sql.c sql.tab.h
 
 clean:
-	rm -f format used_index sql.tab.c sql.tab.h sql.c sql.tab.o sql.o *.o sql.output
+	rm -f format used_index sql.tab.c sql.tab.h sql.c sql.tab.o sql.o *.o sql.output index index_json format_str format_file
 
 .SUFFIXES:	.l .y .c
 
