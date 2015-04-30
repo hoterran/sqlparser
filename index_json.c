@@ -250,8 +250,11 @@ int generateColumn(Stmt *st, list *tabs) {
 int main(int ac, char **av)
 {
     extern FILE *yyin;
+
+    if(ac < 2)
+        return 1;
  
-    if(ac > 1 && !strcmp(av[1], "-d")) {
+    if(ac > 2 && !strcmp(av[1], "-d")) {
          ac--; av++;
     }
  
